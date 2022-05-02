@@ -1,7 +1,9 @@
 #include "OpenGLES/EGLWrapper.h"
-#include "SDL/SDLWrapper.h"
 
+#if !defined(__RSXGL__)
+#include "SDL/SDLWrapper.h"
 #include <SDL2/SDL_syswm.h>
+#endif
 
 #if defined(__RASPBERRY_PI__)
 #include "bcm_host.h"
@@ -214,6 +216,7 @@ static DISPMANX_ELEMENT_HANDLE_T dispman_element;
 static EGL_DISPMANX_WINDOW_T l_dispmanWindow;
 #endif
 
+#if !defined(__RSXGL__)
 static EGLNativeWindowType eglwGetNativeWindow()
 {
     EGLNativeWindowType nativeWindow = NULL;
@@ -319,6 +322,7 @@ static EGLNativeWindowType eglwGetNativeWindow()
 
     return nativeWindow;
 }
+#endif
 
 bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, bool maxQualityFlag) {
     eglwFinalize();
@@ -335,6 +339,7 @@ bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, 
 	bcm_host_init();
 	#endif
 
+    #if !defined(__RSXGL__)
     // Get an EGL display connection.
     #if defined(EGLW_SDL_DISPLAY)
     eglw->display = eglGetDisplaySDL();
@@ -353,6 +358,9 @@ bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, 
 	}
 	#endif
     eglw->display = eglGetDisplay(nativeDisplay);
+    #endif
+    #else /* __RSXGL__ */
+    eglw->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     #endif
     if (eglw->display==EGL_NO_DISPLAY) {
         printf("Cannot get the default EGL display.\n");
@@ -390,9 +398,13 @@ bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, 
 
     // Create an EGL window surface.
     {
+        #if !defined(__RSXGL__)
         static const EGLint SURFACE_ATTRIBUTES[] = { EGL_NONE };
 		EGLNativeWindowType nativeWindow = eglwGetNativeWindow();
 		eglw->surface = eglCreateWindowSurface(eglw->display, eglw->config, nativeWindow, SURFACE_ATTRIBUTES);
+        #else /* __RSXGL__ */
+        eglw->surface = eglCreateWindowSurface(eglw->display, eglw->config, 0, 0);
+        #endif
 		if (eglw->surface==NULL) {
 			printf("Cannot create a window surface.\n");
 			goto on_error;
