@@ -17,7 +17,7 @@ include $(PSL1GHT)/ppu_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/infolder
+SOURCES		:=	source source/infolder source/OpenGLES
 DATA		:=	data
 INCLUDES	:=	include $(PS3DEV)/portlibs/ppu/include
 
@@ -30,7 +30,7 @@ CONTENTID	:=	UP0001-$(APPID)_00-0000000000000000
 #---------------------------------------------------------------------------------
 
 #CFLAGS		=	-O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEIGEN2_SUPPORT
-CFLAGS = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -I/opt/X11/include
+CFLAGS = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEGLW_GLES2 -I/opt/X11/include
 
 #CXXFLAGS	=	$(CFLAGS)
 CXXFLAGS = $(CFLAGS) -std=c++11 

@@ -35,6 +35,8 @@
 #include "infolder/somecode.h"
 #include <SDL2/SDL.h>
 
+#include "OpenGLES/EGLWrapper.h"
+
 // Test program fills these in:
 extern const char * rsxgltest_name;
 
@@ -340,160 +342,176 @@ main(int argc, const char ** argv)
   printf("linking against SDL version %u.%u.%u.\n",
        linked.major, linked.minor, linked.patch);
 
-  glInitDebug(1024*256,tcp_puts);
+  // NOTE: these configs are identical with example but not used in eglwInitialize
+  EglwConfigInfo cfgiMinimal;
+  cfgiMinimal.redSize = 8; cfgiMinimal.greenSize = 8; cfgiMinimal.blueSize = 8; cfgiMinimal.alphaSize = 8;
+  cfgiMinimal.depthSize = 16; cfgiMinimal.stencilSize = 0; cfgiMinimal.samples = 0;
+  EglwConfigInfo cfgiRequested;
+  cfgiRequested.redSize = 8; cfgiRequested.greenSize = 8; cfgiRequested.blueSize = 8; cfgiRequested.alphaSize = 0;
+  cfgiRequested.depthSize = 16; cfgiRequested.stencilSize = 0; cfgiRequested.samples = 0;
+  if (eglwInitialize(&cfgiMinimal, &cfgiRequested, false)) {
+    printf("Cannot create an OpenGL ES context.\n");
+  } else {
+    glInitDebug(1024*256, tcp_puts);
 
-  ioPadInit(1);
-  padInfo padinfo;
-  padData paddata;
+    ioPadInit(1);
+    padInfo padinfo;
+    padData paddata;
 
-  EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    // EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
-  if(dpy != EGL_NO_DISPLAY) {
-    // convert to a timeval structure:
+    // if(dpy != EGL_NO_DISPLAY) {
+      // convert to a timeval structure:
     const float ft = 1.0f / 60.0f;
     float ft_integral, ft_fractional;
     ft_fractional = modff(ft,&ft_integral);
     struct timeval frame_time = { 0,0 };
     frame_time.tv_sec = (int)ft_integral;
     frame_time.tv_usec = (int)(ft_fractional * 1.0e6);
+
+    // EGLint version0 = 0,version1 = 0;
+    // EGLBoolean result;
+    // result = eglInitialize(dpy,&version0,&version1);
+
+    // if(result) {
+    // tcp_printf("eglInitialize version: %i %i:%i\n",version0,version1,(int)result);
+
+
+    // const GLubyte* glVer = glGetString(GL_VERSION);
+    // printf("%s\n", (const char*)glVer);
+    hello();
+    unsigned int time = SDL_GetTicks();
+    printf("%d\n", time);
     
-    EGLint version0 = 0,version1 = 0;
-    EGLBoolean result;
-    result = eglInitialize(dpy,&version0,&version1);
+    // EGLint attribs[] = {
+    //   EGL_RED_SIZE,8,
+    //   EGL_BLUE_SIZE,8,
+    //   EGL_GREEN_SIZE,8,
+    //   EGL_ALPHA_SIZE,8,
+
+    //   EGL_DEPTH_SIZE,16,
+    //   EGL_NONE
+    // };
+    // EGLConfig config;
+    // EGLint nconfig = 0;
+    // result = eglChooseConfig(dpy,attribs,&config,1,&nconfig);
+    // tcp_printf("eglChooseConfig:%i %u configs\n",(int)result,nconfig);
+    // if(nconfig > 0) {
+    // EGLSurface surface = eglCreateWindowSurface(dpy,config,0,0);
+
+    //if(surface != EGL_NO_SURFACE) {
+    // eglQuerySurface(dpy,surface,EGL_WIDTH,&rsxgltest_width);
+    eglQuerySurface(eglwContext->display, eglwContext->surface, EGL_WIDTH, &rsxgltest_width);
+    // eglQuerySurface(dpy,surface,EGL_HEIGHT,&rsxgltest_height);
+    eglQuerySurface(eglwContext->display, eglwContext->surface, EGL_HEIGHT, &rsxgltest_height);
+
+    // tcp_printf("eglCreateWindowSurface: %ix%i\n",rsxgltest_width,rsxgltest_height);
+
+    // EGLContext ctx = eglCreateContext(dpy,config,0,0);
+    // tcp_printf("eglCreateContext: %lu\n",(unsigned long)ctx);
+
+    // if(ctx != EGL_NO_CONTEXT) {
+    atexit(appCleanup);
+    sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, eventHandle, NULL);
     
-    if(result) {
-      tcp_printf("eglInitialize version: %i %i:%i\n",version0,version1,(int)result);
+    struct timeval start_time, current_time;
+    struct timeval timeout_time = {
+      .tv_sec = 6,
+      .tv_usec = 0
+    };
 
-      
-      const GLubyte* glVer = glGetString(GL_VERSION);
-      printf("%s\n", (const char*)glVer);
-      hello();
-      unsigned int time = SDL_GetTicks();
-      printf("%d\n", time);
-      
-      EGLint attribs[] = {
-	EGL_RED_SIZE,8,
-	EGL_BLUE_SIZE,8,
-	EGL_GREEN_SIZE,8,
-	EGL_ALPHA_SIZE,8,
+    // Initialize:
+    // result = eglMakeCurrent(dpy,surface,surface,ctx);
 
-	EGL_DEPTH_SIZE,16,
-	EGL_NONE
-      };
-      EGLConfig config;
-      EGLint nconfig = 0;
-      result = eglChooseConfig(dpy,attribs,&config,1,&nconfig);
-      tcp_printf("eglChooseConfig:%i %u configs\n",(int)result,nconfig);
-      if(nconfig > 0) {
-	EGLSurface surface = eglCreateWindowSurface(dpy,config,0,0);
-	
-	if(surface != EGL_NO_SURFACE) {
-	  eglQuerySurface(dpy,surface,EGL_WIDTH,&rsxgltest_width);
-	  eglQuerySurface(dpy,surface,EGL_HEIGHT,&rsxgltest_height);
+    // if(result == EGL_TRUE) {
+    // tcp_printf("eglMakeCurrent\n");
+    rsxgltest_init(argc,argv);
+    
+    gettimeofday(&start_time,0);
+    rsxgltest_last_time = 0.0f;
 
-	  tcp_printf("eglCreateWindowSurface: %ix%i\n",rsxgltest_width,rsxgltest_height);
-	  
-	  EGLContext ctx = eglCreateContext(dpy,config,0,0);
-	  tcp_printf("eglCreateContext: %lu\n",(unsigned long)ctx);
-	  
-	  if(ctx != EGL_NO_CONTEXT) {
-	    atexit(appCleanup);
-	    sysUtilRegisterCallback(SYSUTIL_EVENT_SLOT0, eventHandle, NULL);
-	    
-	    struct timeval start_time, current_time;
-	    struct timeval timeout_time = {
-	      .tv_sec = 6,
-	      .tv_usec = 0
-	    };
+    while(running) {
+      gettimeofday(&current_time,0);
 
-	    // Initialize:
-	    result = eglMakeCurrent(dpy,surface,surface,ctx);
+      struct timeval elapsed_time;
+      timersub(&current_time,&start_time,&elapsed_time);
+      rsxgltest_elapsed_time = ((float)(elapsed_time.tv_sec)) + ((float)(elapsed_time.tv_usec) / 1.0e6f);
+      rsxgltest_delta_time = rsxgltest_elapsed_time - rsxgltest_last_time;
 
-	    if(result == EGL_TRUE) {
-	      tcp_printf("eglMakeCurrent\n");
-	      rsxgltest_init(argc,argv);
-	      
-	      gettimeofday(&start_time,0);
-	      rsxgltest_last_time = 0.0f;
-	      
-	      while(running) {
-		gettimeofday(&current_time,0);
-		
-		struct timeval elapsed_time;
-		timersub(&current_time,&start_time,&elapsed_time);
-		rsxgltest_elapsed_time = ((float)(elapsed_time.tv_sec)) + ((float)(elapsed_time.tv_usec) / 1.0e6f);
-		rsxgltest_delta_time = rsxgltest_elapsed_time - rsxgltest_last_time;
-		
-		rsxgltest_last_time = rsxgltest_elapsed_time;
-		
-		//result = eglMakeCurrent(dpy,surface,surface,ctx);
-		
-		ioPadGetInfo(&padinfo);
-		for(size_t i = 0;i < MAX_PADS;++i) {
-		  if(padinfo.status[i]) {
-		    ioPadGetData(i,&paddata);
-		    rsxgltest_pad(i,&paddata);
-		    break;
-		  }
-		}
-		
-		if(drawing) {
-		  result = rsxgltest_draw();
-		  if(!result) break;
-		}
-		
-		result = eglSwapBuffers(dpy,surface);
-		
-		EGLint e = eglGetError();
-		if(!result) {
-		  tcp_printf("Swap sync timed-out: %x\n",e);
-		  break;
-		}
-		else {
-		  struct timeval t, elapsed_time;
-		  gettimeofday(&t,0);
-		  timersub(&t,&current_time,&elapsed_time);
-		  
-		  if(timercmp(&elapsed_time,&frame_time,<)) {
-		    struct timeval sleep_time;
-		    timersub(&frame_time,&elapsed_time,&sleep_time);
-		    usleep((sleep_time.tv_sec * 1e6) + sleep_time.tv_usec);
-		  }
-		  
-		  sysUtilCheckCallback();
-		}
-	      }
-	    
-	      rsxgltest_exit();
-	    }
-	    else {
-	      tcp_printf("eglMakeCurrent failed: %x\n",eglGetError());
-	    }
+      rsxgltest_last_time = rsxgltest_elapsed_time;
 
-	    result = eglDestroyContext(dpy,ctx);
-	    tcp_printf("eglDestroyContext:%i\n",(int)result);
-	  }
-	  else {
-	    tcp_printf("eglCreateContext failed: %x\n",eglGetError());
-	  }
-	}
-	else {
-	  tcp_printf("eglCreateWindowSurface failed: %x\n",eglGetError());
-	}
+      //result = eglMakeCurrent(dpy,surface,surface,ctx);
+
+      ioPadGetInfo(&padinfo);
+      for(size_t i = 0;i < MAX_PADS;++i) {
+        if(padinfo.status[i]) {
+          ioPadGetData(i,&paddata);
+          rsxgltest_pad(i,&paddata);
+          break;
+        }
       }
-      
-      result = eglTerminate(dpy);
-      tcp_printf("eglTerminate:%i\n",(int)result);
 
-      exit(0);
+      EGLBoolean result;
+      if(drawing) {
+        result = rsxgltest_draw();
+        if(!result) break;
+      }
+
+      // result = eglSwapBuffers(dpy,surface);
+      eglwSwapBuffers();
+
+      // EGLint e = eglGetError();
+      // if(!result) {
+      //   tcp_printf("Swap sync timed-out: %x\n",e);
+      //   break;
+      // }
+      // else {
+      {
+        struct timeval t, elapsed_time;
+        gettimeofday(&t,0);
+        timersub(&t,&current_time,&elapsed_time);
+
+        if(timercmp(&elapsed_time,&frame_time,<)) {
+          struct timeval sleep_time;
+          timersub(&frame_time,&elapsed_time,&sleep_time);
+          usleep((sleep_time.tv_sec * 1e6) + sleep_time.tv_usec);
+        }
+
+        sysUtilCheckCallback();
+      }
     }
-    else {
-      tcp_printf("eglInitialize failed: %x\n",eglGetError());
-    }
+
+    rsxgltest_exit();
   }
-  else {
-    tcp_printf("eglGetDisplay failed: %x\n",eglGetError());
-  }
+  // }
+  // else {
+  //   tcp_printf("eglMakeCurrent failed: %x\n",eglGetError());
+  // }
+
+  // result = eglDestroyContext(dpy,ctx);
+  // tcp_printf("eglDestroyContext:%i\n",(int)result);
+  // }
+  // else {
+  //   tcp_printf("eglCreateContext failed: %x\n",eglGetError());
+  // }
+  // }
+  // else {
+  //   tcp_printf("eglCreateWindowSurface failed: %x\n",eglGetError());
+  // }
+  // }
+  
+  // result = eglTerminate(dpy);
+  // tcp_printf("eglTerminate:%i\n",(int)result);
+
+  // exit(0);
+  // }
+  // else {
+  //   tcp_printf("eglInitialize failed: %x\n",eglGetError());
+  // }
+  // }
+  // else {
+  //   tcp_printf("eglGetDisplay failed: %x\n",eglGetError());
+  // }
 
   appCleanup();
     
