@@ -2,12 +2,27 @@
 #define OpenGLWrapper_h
 
 #include <EGL/egl.h>
+#if defined(__RSX__)
+// if compiling for RSX ignore standart GLES2 headers
+// and use rsxgl's ones
+// Because we still use EGLW_GLES2 define
+
+#ifndef GL3_PROTOTYPES
+#define GL3_PROTOTYPES
+#endif
+
+#include <GL3/gl3.h>
+#include <GL3/rsxgl.h>
+#include <GL3/rsxgl3ext.h>
+
+#else
 #if defined(EGLW_GLES2)
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #else
 #include <GLES/gl.h>
 #include <GLES/glext.h>
+#endif
 #endif
 
 #include <stdbool.h>

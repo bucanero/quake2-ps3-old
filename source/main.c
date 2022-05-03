@@ -36,6 +36,7 @@
 #include <SDL2/SDL.h>
 
 #include "OpenGLES/EGLWrapper.h"
+#include "OpenGLES/OpenGLWrapper.h"
 
 // Test program fills these in:
 extern const char * rsxgltest_name;

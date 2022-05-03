@@ -1,4 +1,4 @@
-#include "OpenGLES/OpenGLWrapper.h"
+#include "OpenGLWrapper.h"
 
 #include <math.h>
 #include <stdlib.h>
