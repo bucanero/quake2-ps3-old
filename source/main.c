@@ -356,6 +356,11 @@ int main(int argc, const char** argv)
     if (eglwInitialize(&cfgiMinimal, &cfgiRequested, false)) {
         printf("Cannot create an OpenGL ES context.\n");
     } else {
+        if (oglwCreate()) {
+            printf("oglwCreate failed!");    
+        };
+        printf("oglwCreated!");
+
         glInitDebug(1024*256, tcp_puts);
 
         ioPadInit(1);

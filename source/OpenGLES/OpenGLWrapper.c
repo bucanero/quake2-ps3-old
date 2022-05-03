@@ -133,7 +133,12 @@ static void oglwCheckError()
 #if defined(EGLW_GLES2)
 
 static const char *oglwVertexShaderSources =
+// Since we are not using real GLES2
+// those 'precision' lines ain't working.
+// Moreover shaders can not comile with them on RSXGL
+#if !defined(__RSX__)
 "precision highp float;\n"
+#endif
 "uniform mat4 u_transformation;\n"
 "attribute vec4 a_position;\n"
 "attribute vec4 a_color;\n"
@@ -152,7 +157,9 @@ static const char *oglwVertexShaderSources =
 ;
 
 static const char *oglwFragmentShaderSources =
+#if !defined(__RSX__)
 "precision mediump float;\n"
+#endif
 "uniform bool u_tex0Enabled;\n"
 "uniform bool u_tex1Enabled;\n"
 "uniform bool u_tex0BlendingEnabled;\n"
