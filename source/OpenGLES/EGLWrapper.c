@@ -1,7 +1,9 @@
-#include "OpenGLES/EGLWrapper.h"
-#include "SDL/SDLWrapper.h"
+#include "EGLWrapper.h"
 
+#if !defined(__RSX__)
+#include "SDL/SDLWrapper.h"
 #include <SDL2/SDL_syswm.h>
+#endif
 
 #if defined(__RASPBERRY_PI__)
 #include "bcm_host.h"
@@ -116,10 +118,14 @@ static bool eglwFindConfig(EglwContext *eglw, const EglwConfigInfo *minimalCfgi,
 
     if (printConfigFlag)
     {
-        printf("Minimal config: %s\n", eglwGetConfigInfoString(minimalCfgi));
+        printf("Minimal config:   %s\n", eglwGetConfigInfoString(minimalCfgi));
         printf("Requested config: %s\n", eglwGetConfigInfoString(requestedCfgi));
     }
 
+    // Best config search not working out of the box needs deeper look
+    // For now using fixed predefined config from example
+    #define __RSX__
+    #if !defined(__RSX__)
     EGLint frameBufferAttributes[10*2+1];
     {
         EGLint *fba = frameBufferAttributes;
@@ -200,6 +206,28 @@ static bool eglwFindConfig(EglwContext *eglw, const EglwConfigInfo *minimalCfgi,
         eglw->configInfo = cfgiBest;
         printf("Using config %i: %s\n", configBestIndex, eglwGetConfigInfoString(&cfgiBest));
     }
+    #else
+    EGLint attribs[] = {
+        EGL_RED_SIZE,    8,
+        EGL_BLUE_SIZE,   8,
+        EGL_GREEN_SIZE,  8,
+        EGL_ALPHA_SIZE,  8,
+
+        EGL_DEPTH_SIZE, 16,
+        EGL_NONE
+    };
+    configs = malloc(sizeof(EGLConfig) * 1);
+    if (!eglChooseConfig(eglw->display, attribs, configs, 1, &configNb) || configNb <= 0) {
+        printf("Cannot find an EGL config.\n");
+        goto on_error;
+    }
+    EglwConfigInfo cfgi;
+    eglwGetConfigInfo(eglw->display, configs[0], &cfgi);
+    eglw->config = configs[0];
+    eglw->configInfo = cfgi;
+    printf("Using config: %s\n", eglwGetConfigInfoString(&cfgi));
+
+    #endif
 
     free(configs);
     return false;
@@ -214,6 +242,7 @@ static DISPMANX_ELEMENT_HANDLE_T dispman_element;
 static EGL_DISPMANX_WINDOW_T l_dispmanWindow;
 #endif
 
+#if !defined(__RSX__)
 static EGLNativeWindowType eglwGetNativeWindow()
 {
     EGLNativeWindowType nativeWindow = NULL;
@@ -319,6 +348,7 @@ static EGLNativeWindowType eglwGetNativeWindow()
 
     return nativeWindow;
 }
+#endif
 
 bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, bool maxQualityFlag) {
     eglwFinalize();
@@ -335,6 +365,7 @@ bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, 
 	bcm_host_init();
 	#endif
 
+    #if !defined(__RSX__)
     // Get an EGL display connection.
     #if defined(EGLW_SDL_DISPLAY)
     eglw->display = eglGetDisplaySDL();
@@ -353,6 +384,9 @@ bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, 
 	}
 	#endif
     eglw->display = eglGetDisplay(nativeDisplay);
+    #endif
+    #else /* __RSX__ */
+    eglw->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     #endif
     if (eglw->display==EGL_NO_DISPLAY) {
         printf("Cannot get the default EGL display.\n");
@@ -390,9 +424,13 @@ bool eglwInitialize(EglwConfigInfo *minimalCfgi, EglwConfigInfo *requestedCfgi, 
 
     // Create an EGL window surface.
     {
+        #if !defined(__RSX__)
         static const EGLint SURFACE_ATTRIBUTES[] = { EGL_NONE };
 		EGLNativeWindowType nativeWindow = eglwGetNativeWindow();
 		eglw->surface = eglCreateWindowSurface(eglw->display, eglw->config, nativeWindow, SURFACE_ATTRIBUTES);
+        #else /* __RSX__ */
+        eglw->surface = eglCreateWindowSurface(eglw->display, eglw->config, 0, 0);
+        #endif
 		if (eglw->surface==NULL) {
 			printf("Cannot create a window surface.\n");
 			goto on_error;
