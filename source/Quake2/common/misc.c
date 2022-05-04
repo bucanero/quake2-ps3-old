@@ -195,12 +195,8 @@ static void Qcommon_Init(int argc, char **argv)
 
 	z_chain.next = z_chain.prev = &z_chain;
 
-#warning "INPUT NOT IMPLEMENTED"
-#if 0
-
 	extern bool IN_processEvent(SDL_Event *event);
 	sdlwInitialize(IN_processEvent, 0);
-#endif
 	sdlwEnableDefaultEventManagement(false);
 
 	/* prepare enough of the subsystems to handle
@@ -224,6 +220,11 @@ static void Qcommon_Init(int argc, char **argv)
 	Cbuf_AddEarlyCommands(false);
 	Cbuf_Execute();
 
+#if 1 //
+#warning "Ignoring file system"
+	printf("Skiping FS_InitFilesystem...\n");
+	printf("Skiping Cbuf_InitFilesystem...\n");
+#else
 	FS_InitFilesystem();
 
 	Cbuf_AddText("exec default.cfg\n"); // default.cfg is in a .pak file and thus cannot be modified.
@@ -232,6 +233,8 @@ static void Qcommon_Init(int argc, char **argv)
 
 	Cbuf_AddEarlyCommands(true);
 	Cbuf_Execute();
+	printf("Cbuf_Execute complited...\n");
+#endif
 
 	/* init commands and vars */
 	Cmd_AddCommand("z_stats", Z_Stats_f);
@@ -267,6 +270,7 @@ static void Qcommon_Init(int argc, char **argv)
 	Netchan_Init();
 	SV_Init();
 	#ifndef DEDICATED_ONLY
+	printf("Starting CL_Init...\n");
 	CL_Init();
 	#endif
 

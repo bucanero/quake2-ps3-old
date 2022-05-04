@@ -843,21 +843,26 @@ void CL_Init()
 	Con_Init();
 	S_Init();
 	SCR_Init();
+	printf("CL_Init: Starting R_initialize...\n");
 	R_initialize();
 #if defined(NOT_IMPLEMENTED_INPUT)
 #else
+	printf("CL_Init: Starting IN_Init...\n");
 	IN_Init();
 #endif
 
+	printf("CL_Init: Starting V_Init...\n");
 	V_Init();
 
 	net_message.data = net_message_buffer;
 	net_message.maxsize = sizeof(net_message_buffer);
 
+	printf("CL_Init: Starting M_Init...\n");
 	M_Init();
 
 	cls.disable_screen = true; /* don't draw yet */
 
+	printf("CL_Init: Starting CL_InitLocal...\n");
 	CL_InitLocal();
 
 	Cbuf_Execute();

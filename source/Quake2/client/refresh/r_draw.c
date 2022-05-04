@@ -40,7 +40,11 @@ void Draw_InitLocal()
 	gl_nolerp_list = Cvar_Get("gl_nolerp_list", "pics/conchars.pcx pics/ch1.pcx pics/ch2.pcx pics/ch3.pcx", 0);
 
 	/* load console characters */
+	#if 1
+	#warning "not using filesystem"
+	#else
 	draw_chars = R_FindImage("pics/conchars.pcx", it_pic);
+	#endif
 }
 
 static int Draw_CharCount = 0;
@@ -324,6 +328,11 @@ void Draw_StretchRaw(int x, int y, int w, int h, int cols, int rows, byte *data)
 
 int Draw_GetPalette()
 {
+	#if 1
+	printf("Draw_GetPalette FS not implemented skiping...\n");
+	return 0;
+	#endif
+
 	byte *pic, *pal;
 	int width, height;
 

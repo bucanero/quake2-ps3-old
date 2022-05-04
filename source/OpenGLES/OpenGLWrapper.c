@@ -326,6 +326,7 @@ static GLint oglwGetUniformLocation(GLuint program, const char *name)
 static GLint oglwGetAttributeLocation(GLuint program, const char *name)
 {
     GLint location = glGetAttribLocation(program, name);
+    
     if (location < 0)
     {
         printf("Cannot find attribute location for %s\n", name);
@@ -338,21 +339,64 @@ static bool oglwSetupShaders(OpenGLWrapper *oglw)
     GLuint vertexShader, fragmentShader, program;
 	GLint linked;
 
+	printf("Starting oglwCreateShader 1...\n");
     vertexShader = oglwCreateShader(oglwVertexShaderSources, GL_VERTEX_SHADER);
     if (vertexShader == 0) goto on_error;
     oglw->vertexShader = vertexShader;
+    int err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
 
+    printf("Starting oglwCreateShader 2...\n");
     fragmentShader = oglwCreateShader(oglwFragmentShaderSources, GL_FRAGMENT_SHADER);
     if (fragmentShader == 0) goto on_error;
+    oglw->vertexShader = vertexShader;
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
     oglw->fragmentShader = fragmentShader;
     
     program = glCreateProgram();
     if (program == 0) goto on_error;
+    printf("Starting glAttachShader 1...\n");
     glAttachShader(program, vertexShader);
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
     oglw->program = program;
+    printf("Starting glAttachShader 2...\n");
     glAttachShader(program, fragmentShader);
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
+    printf("Starting glLinkProgram...\n");
     glLinkProgram(program);
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
+    printf("Starting glGetProgramiv...\n");
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
     if (!linked)
     {
         GLint logLength;
@@ -381,7 +425,14 @@ static bool oglwSetupShaders(OpenGLWrapper *oglw)
     if ((oglw->s_tex1 = oglwGetUniformLocation(program, "s_tex1")) < 0) goto on_error;
     if ((oglw->u_alphaThreshold = oglwGetUniformLocation(program, "u_alphaThreshold")) < 0) goto on_error;
 
+    printf("Starting glUseProgram...\n");
     glUseProgram(program);
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("glGetError() = 0x%x\n", err);
+		return false;
+	}
 
     if (OglwMatrixStack_allocate(&oglw->modelViewStack, 16)) goto on_error;
     if (OglwMatrixStack_allocate(&oglw->projectionStack, 16)) goto on_error;
@@ -393,13 +444,50 @@ static bool oglwSetupShaders(OpenGLWrapper *oglw)
     }
     oglw->transformationDirty = true;
 
-    glUniform1i(oglw->u_tex0Enabled, 1);
-    glUniform1i(oglw->u_tex1Enabled, 0);
-    glUniform1i(oglw->u_tex0BlendingEnabled, 1);
-    glUniform1i(oglw->u_tex1BlendingEnabled, 1);
-    glUniform1i(oglw->s_tex0, 0);
-    glUniform1i(oglw->s_tex1, 1);
+    printf("Starting glUniform1i s...\n");
+    // glUniform1i(oglw->u_tex0Enabled, 1);
+    // err = glGetError();
+	// if (err != GL_NO_ERROR)
+	// {
+	// 	printf("u_tex0Enabled glGetError() = 0x%x\n", err);
+	// }
+    // glUniform1i(oglw->u_tex1Enabled, 0);
+    // err = glGetError();
+	// if (err != GL_NO_ERROR)
+	// {
+	// 	printf("u_tex1Enabled glGetError() = 0x%x\n", err);
+	// }
+    // glUniform1i(oglw->u_tex0BlendingEnabled, 1);
+    // err = glGetError();
+	// if (err != GL_NO_ERROR)
+	// {
+	// 	printf("u_tex0BlendingEnabled glGetError() = 0x%x\n", err);
+	// }
+    // glUniform1i(oglw->u_tex1BlendingEnabled, 1);
+    // err = glGetError();
+	// if (err != GL_NO_ERROR)
+	// {
+	// 	printf("u_tex1BlendingEnabled glGetError() = 0x%x\n", err);
+	// }
+    // glUniform1i(oglw->s_tex0, 0);
+    // err = glGetError();
+	// if (err != GL_NO_ERROR)
+	// {
+	// 	printf("s_tex0 glGetError() = 0x%x\n", err);
+	// }
+    // glUniform1i(oglw->s_tex1, 1);
+    // err = glGetError();
+	// if (err != GL_NO_ERROR)
+	// {
+	// 	printf("s_tex1 glGetError() = 0x%x\n", err);
+	// }
     glUniform1f(oglw->u_alphaThreshold, 0);
+    err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		printf("u_alphaThreshold() = 0x%x\n", err);
+		return false;
+	}
     
     return false;
 on_error:
@@ -454,12 +542,48 @@ bool oglwCreate() {
         oglw->viewport.height = 0;
         oglw->viewport.depthNear = 0.0f;
         oglw->viewport.depthFar = 1.0f;
+    	int err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            printf("glGetError() = 0x%x\n", err);
+            return false;
+        }
+        printf("no errors prior glViewport\n");
+
         glViewport(0, 0, 0, 0);
+        err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            printf("glGetError() = 0x%x\n", err);
+            return false;
+        }
+        printf("no errors after glViewport\n");
         glDepthRangef(0.0f, 1.0f);
+        err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            printf("glGetError() = 0x%x\n", err);
+            return false;
+        }
+        printf("no errors after glDepthRangef\n");
 
         #if defined(EGLW_GLES2)
         oglwInitializeShaders(oglw);
+        err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            printf("oglwInitializeShaders: glGetError() = 0x%x\n", err);
+            return false;
+        }
+        printf("no errors after oglwInitializeShaders\n");
         if (oglwSetupShaders(oglw)) goto on_error;
+        err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            printf("oglwSetupShaders: glGetError() = 0x%x\n", err);
+            return false;
+        }
+        printf("no errors after oglwSetupShaders\n");
         #endif
 
         oglw->smoothShadingEnabled=oglw->smoothShadingEnabledRequested=true;

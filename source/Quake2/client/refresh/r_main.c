@@ -167,17 +167,24 @@ void R_Entity_rotate(entity_t *e)
 
 static void R_SetDefaultState()
 {
+#if !defined(__RSX__)
+#endif
+	printf("R_SetDefaultState starting glCullFace...\n");
 	glCullFace(GL_FRONT);
+	printf("R_SetDefaultState starting glDisable...\n");
 	glDisable(GL_CULL_FACE);
 
+	printf("R_SetDefaultState starting oglwEnableSmoothShading...\n");
 	oglwEnableSmoothShading(false);
 
+	printf("R_SetDefaultState starting oglwEnableTexturing...\n");
 	oglwEnableTexturing(0, true);
 
 	R_TextureMode(r_texture_filter->string);
 	R_TextureAlphaMode(r_texture_alphaformat->string);
 	R_TextureSolidMode(r_texture_solidformat->string);
 
+	printf("R_SetDefaultState starting oglwSetTextureBlending...\n");
 	oglwSetTextureBlending(0, GL_REPLACE);
 
 	#if defined(EGLW_GLES1)
@@ -3820,6 +3827,10 @@ static void R_restart();
 
 static bool R_Window_update(bool forceFlag)
 {
+#if defined(__RSX__)
+	return false;
+#endif
+
 	SdlwContext *sdlw = sdlwContext;
 
     int maxWindowWidth, maxWindowHeight;
@@ -4005,12 +4016,22 @@ static bool R_Window_createContext()
 {
 	while (1)
 	{
+		#if defined(__RSX__)
+		// NOTE: these configs are identical with example but not used in eglwInitialize
+		EglwConfigInfo cfgiMinimal;
+		cfgiMinimal.redSize = 8; cfgiMinimal.greenSize = 8; cfgiMinimal.blueSize = 8; cfgiMinimal.alphaSize = 8;
+		cfgiMinimal.depthSize = 16; cfgiMinimal.stencilSize = 0; cfgiMinimal.samples = 0;
+		EglwConfigInfo cfgiRequested;
+		cfgiRequested.redSize = 8; cfgiRequested.greenSize = 8; cfgiRequested.blueSize = 8; cfgiRequested.alphaSize = 0;
+		cfgiRequested.depthSize = 16; cfgiRequested.stencilSize = 0; cfgiRequested.samples = 0;
+		#else
 		EglwConfigInfo cfgiMinimal;
 		cfgiMinimal.redSize = 5; cfgiMinimal.greenSize = 5; cfgiMinimal.blueSize = 5; cfgiMinimal.alphaSize = 0;
 		cfgiMinimal.depthSize = 16; cfgiMinimal.stencilSize = 0; cfgiMinimal.samples = 0;
 		EglwConfigInfo cfgiRequested;
 		cfgiRequested.redSize = 5; cfgiRequested.greenSize = 5; cfgiRequested.blueSize = 5; cfgiRequested.alphaSize = 0;
 		cfgiRequested.depthSize = 16; cfgiRequested.stencilSize = 1; cfgiRequested.samples = (int)r_msaa_samples->value;
+		#endif
 
 		if (eglwInitialize(&cfgiMinimal, &cfgiRequested, false))
 		{
@@ -4040,10 +4061,35 @@ static bool R_Window_createContext()
 	eglSwapInterval(eglwContext->display, gl_swapinterval->value ? 1 : 0);
 #endif
 
+	int err;
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors prior oglwCreate\n");
+
 	if (oglwCreate())
 		goto on_error;
 
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors after oglwCreate\n");
+
+	printf("starting R_Gamma_initialize...\n");
 	R_Gamma_initialize();
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors after R_Gamma_initialize\n");
 
 	SDL_ShowCursor(0);
 
@@ -4222,12 +4268,33 @@ static void R_Register()
 
 static bool R_setup()
 {
+	int err;
+	
+	printf("R_setup starting Swap_Init...\n");
 	Swap_Init();
+	printf("R_setup starting Draw_GetPalette...\n");
 	Draw_GetPalette();
+	printf("R_setup starting R_Register...\n");
 	R_Register();
 
+
+	#if defined(__RSX__)
+	printf("R_setup starting SDL_WasInit (RSX)...\n");
+	if (!SDL_WasInit(SDL_INIT_TIMER | SDL_INIT_EVENTS))
+	{
+		printf("R_setup starting SDL_Init (RSX)...\n");
+		if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_EVENTS) == -1)
+			return false;
+
+		const char * driverName = SDL_GetCurrentVideoDriver();
+		R_printf(PRINT_ALL, "SDL video driver is \"%s\".\n", driverName);
+	}
+
+	#else
+	printf("R_setup starting SDL_WasInit...\n");
 	if (!SDL_WasInit(SDL_INIT_VIDEO))
 	{
+		printf("R_setup starting SDL_Init...\n");
 		if (SDL_Init(SDL_INIT_VIDEO) == -1)
 			return false;
 
@@ -4241,33 +4308,49 @@ static bool R_setup()
 		R_printf(PRINT_ALL, "Could not create a window\n");
         return false;
     }
+	#endif
+
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors prior R_Window_createContext\n");
     
 	// Create a rendering context.
+	printf("creating window context...\n");
 	if (!R_Window_createContext())
 	{
 		R_printf(PRINT_ALL, "Could not create a rendering context\n");
 		return false;
 	}
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors after R_Window_createContext\n");
 
 	R_Strings();
 
 	R_printf(PRINT_ALL, "\n\nProbing for OpenGL extensions:\n");
 	const char *extensions_string = (const char *)glGetString(GL_EXTENSIONS);
+	printf("probe ended\n");
 
+#if !defined(__RSX__)
 	if (strstr(extensions_string, "GL_EXT_discard_framebuffer"))
 	{
 		R_printf(PRINT_ALL, "Using GL_EXT_discard_framebuffer\n");
-#if !defined(__RSX__)
 		gl_config.discardFramebuffer = (PFNGLDISCARDFRAMEBUFFEREXTPROC)eglGetProcAddress("glDiscardFramebufferEXT");
-#endif
 	}
 	else
 	{
 		R_printf(PRINT_ALL, "GL_EXT_discard_framebuffer not found\n");
-#if !defined(__RSX__)
 		gl_config.discardFramebuffer = NULL;
-#endif
 	}
+#endif
 
 #if !defined(__RSX__)
 	if (strstr(extensions_string, "GL_EXT_texture_filter_anisotropic"))
@@ -4280,11 +4363,9 @@ static bool R_setup()
 	else
 	{
 		R_printf(PRINT_ALL, "GL_EXT_texture_filter_anisotropic not found\n");
-#endif
 		gl_config.anisotropic = false;
 		gl_config.max_anisotropy = 0.0f;
 		Cvar_SetValue("r_texture_anisotropy_available", 0.0f);
-#if !defined(__RSX__)
 	}
 #endif
 
@@ -4300,20 +4381,70 @@ static bool R_setup()
 	gl_state.stereo_mode = gl_stereo->value;
 
 	Cvar_Set("scr_drawall", "0");
-
-	R_SetDefaultState();
-
-	R_InitImages();
-	Mod_Init();
-	R_NoTexture_Init();
-	R_Particles_initialize();
-	Draw_InitLocal();
-
-	int err = glGetError();
+	err = glGetError();
 	if (err != GL_NO_ERROR)
 	{
 		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
 	}
+	printf("no errors\n");
+
+	printf("R_setup starting R_SetDefaultState...\n");
+	R_SetDefaultState();
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors\n");
+
+	printf("R_setup starting R_InitImages...\n");
+	R_InitImages();
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors\n");
+	printf("R_setup starting Mod_Init...\n");
+	Mod_Init();
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors\n");
+	printf("R_setup starting R_NoTexture_Init...\n");
+	R_NoTexture_Init();
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors\n");
+	printf("R_setup starting R_Particles_initialize...\n");
+	R_Particles_initialize();
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("no errors\n");
+	printf("R_setup starting Draw_InitLocal...\n");
+	Draw_InitLocal();
+
+	err = glGetError();
+	if (err != GL_NO_ERROR)
+	{
+		R_printf(PRINT_ALL, "glGetError() = 0x%x\n", err);
+		return false;
+	}
+	printf("R_setup ended no errors\n");
 
 	return true;
 }
@@ -4368,6 +4499,8 @@ static void R_start()
 
 	// Ensure that all key states are cleared.
 	Key_MarkAllUp();
+
+	printf("R_start ended\n");
 
     cls.disable_screen = false;
 }

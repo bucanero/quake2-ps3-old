@@ -38,7 +38,8 @@
 #include "OpenGLES/EGLWrapper.h"
 #include "OpenGLES/OpenGLWrapper.h"
 
-#include "Quake2/common/crc.h"
+//#include "Quake2/common/crc.h"
+#include "Quake2/common/common.h"
 
 // Test program fills these in:
 extern const char * rsxgltest_name;
@@ -348,6 +349,10 @@ int main(int argc, const char** argv)
     printf("linking against SDL version %u.%u.%u.\n",
         linked.major, linked.minor, linked.patch);
 
+    #if 1 // Testing QCommon run
+        Qcommon_Run(argc, argv);
+    #else
+
     // NOTE: these configs are identical with example but not used in eglwInitialize
     EglwConfigInfo cfgiMinimal;
     cfgiMinimal.redSize = 8; cfgiMinimal.greenSize = 8; cfgiMinimal.blueSize = 8; cfgiMinimal.alphaSize = 8;
@@ -357,7 +362,9 @@ int main(int argc, const char** argv)
     cfgiRequested.depthSize = 16; cfgiRequested.stencilSize = 0; cfgiRequested.samples = 0;
     if (eglwInitialize(&cfgiMinimal, &cfgiRequested, false)) {
         printf("Cannot create an OpenGL ES context.\n");
-    } else {
+    } else 
+    #endif
+    {
         if (oglwCreate()) {
             printf("oglwCreate failed!");    
         };
