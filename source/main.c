@@ -38,6 +38,8 @@
 #include "OpenGLES/EGLWrapper.h"
 #include "OpenGLES/OpenGLWrapper.h"
 
+#include "Quake2/common/crc.h"
+
 // Test program fills these in:
 extern const char * rsxgltest_name;
 

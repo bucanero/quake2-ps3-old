@@ -17,7 +17,45 @@ include $(PSL1GHT)/ppu_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/infolder source/OpenGLES
+SOURCES		:=	source \
+                source/infolder \
+				source/OpenGLES \
+				source/SDL \
+				source/Quake2/common/shared \
+				source/Quake2/common \
+				source/Quake2/game/savegame/tables \
+				source/Quake2/game/monster/berserker \
+				source/Quake2/game/monster/boss2 \
+				source/Quake2/game/monster/boss3 \
+				source/Quake2/game/monster/brain \
+				source/Quake2/game/monster/chick \
+				source/Quake2/game/monster/flipper \
+				source/Quake2/game/monster/float \
+				source/Quake2/game/monster/flyer \
+				source/Quake2/game/monster/gladiator \
+				source/Quake2/game/monster/gunner \
+				source/Quake2/game/monster/hover \
+				source/Quake2/game/monster/infantry \
+				source/Quake2/game/monster/insane \
+				source/Quake2/game/monster/medic \
+				source/Quake2/game/monster/misc \
+				source/Quake2/game/monster/mutant \
+				source/Quake2/game/monster/parasite \
+				source/Quake2/game/monster/soldier \
+				source/Quake2/game/monster/supertank \
+				source/Quake2/game/monster/tank \
+				source/Quake2/game/player \
+				source/Quake2/game/savegame \
+				source/Quake2/game \
+				source/Quake2/client \
+				source/Quake2/client/refresh \
+				source/Quake2/client/refresh/constansts \
+				source/Quake2/client/refresh/files \
+				source/Quake2/client/sound \
+				source/Quake2/client/menu \
+				source/Quake2/server \
+				source/Quake2/backends/sdl \
+				source/Quake2/backends/ps3
 DATA		:=	data
 INCLUDES	:=	include $(PS3DEV)/portlibs/ppu/include
 

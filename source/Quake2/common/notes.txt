@@ -1,0 +1,2 @@
+crc.h - exists in orig q2
+crc.c - valid until v.7.0.1 
