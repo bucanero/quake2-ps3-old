@@ -36,6 +36,7 @@
 #include <SDL2/SDL.h>
 
 #include "OpenGLES/EGLWrapper.h"
+#include "ps3/system.h"
 
 // Test program fills these in:
 extern const char * rsxgltest_name;
@@ -331,6 +332,7 @@ appCleanup()
 
 int main(int argc, const char** argv)
 {
+    Sys_Init();
     netInitialize();
     tcp_init();
     tcp_printf("%s\n",rsxgltest_name);
@@ -390,7 +392,6 @@ int main(int argc, const char** argv)
 
         gettimeofday(&start_time,0);
         rsxgltest_last_time = 0.0f;
-
         while (running) {
             gettimeofday(&current_time,0);
 
