@@ -1,25 +1,13 @@
 #ifndef _SYSTEM_H_
 #define _SYSTEM_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdlib.h>
 
-#ifdef true
- #undef true
-#endif
-
-#ifdef false
- #undef false
-#endif
-
-typedef enum {false, true}  qboolean;
+#include "../common/header/shared.h"
 
 char *Sys_ConsoleInput(void);
 void Sys_ConsoleOutput(char *string);
-void Sys_Error(char *error, ...);
+// void Sys_Error(char *error, ...);
 void Sys_Quit(void);
 void Sys_Init(void);
 char *Sys_GetHomeDir(void);
@@ -34,12 +22,8 @@ qboolean Sys_SetWorkDir(char *path);
 qboolean Sys_Realpath(const char *in, char *out, size_t size);
 
 int Sys_Milliseconds(void);
-// void Sys_Mkdir(const char *path);
-// qboolean Sys_IsDir(const char *path);
-// qboolean Sys_IsFile(const char *path);
-
-#ifdef __cplusplus
-}
-#endif
+void Sys_Mkdir(const char *path);
+qboolean Sys_IsDir(const char *path);
+qboolean Sys_IsFile(const char *path);
 
 #endif /* _SYSTEM_H_ */

@@ -7,14 +7,18 @@
 #include <ppu-lv2.h>
 #include <lv2/syscalls.h>
 
+#include <sys/file.h>
+#include <sys/stat.h>
 
 void 
 Sys_Error(char *error, ...)
 {
+	// FIXME Implement Sys_Quit
 }
 
 void Sys_Quit(void)
 {
+	// FIXME Implement Sys_Quit
 }
 
 void 
@@ -116,6 +120,81 @@ Sys_Nanosleep(int nanosec)
 //  Filesytem
 // ---------------------------------------------
 
+#define PS3_PATH_MAX 256
+
+// /absolute/path/to/directory
+void 
+Sys_Mkdir(const char *path)
+{
+	// code based on one in apollo's savetool
+	
+	char fullpath[PS3_PATH_MAX];
+
+	//snprintf(fullpath, sizeof(fullpath), "%s", path);
+	strlcpy(fullpath, path, PS3_PATH_MAX);
+
+    char* ptr = fullpath;
+
+	// creating path to directory
+	while (*ptr)
+    {
+    	ptr++;
+        while (*ptr && *ptr != '/')
+		{
+            ptr++;
+		}
+
+        char last = *ptr;
+		*ptr = 0;
+
+		printf("%s\n", fullpath);
+        if (Sys_IsDir(fullpath) == false)
+        {
+            if (mkdir(fullpath, 0777) < 0)
+			{
+                return;
+			}
+            sysLv2FsChmod(fullpath, S_IFDIR | 0777);
+        }
+        
+        *ptr = last;
+    }
+
+    return;
+}
+
+qboolean
+Sys_IsDir(const char *path)
+{
+	struct stat sb;
+
+	if (stat(path, &sb) != -1)
+	{
+		if (S_ISDIR(sb.st_mode))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+qboolean
+Sys_IsFile(const char *path)
+{
+	struct stat sb;
+
+	if (stat(path, &sb) != -1)
+	{
+		if (S_ISREG(sb.st_mode))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 // returns null terminated string -- path to
 // config directory should end with .YQ2
 // which is set at <cfgdir> variable and
@@ -123,6 +202,7 @@ Sys_Nanosleep(int nanosec)
 char*
 Sys_GetHomeDir(void)
 {
+	// FIXME Implement Sys_GetHomeDir
 	return NULL;
 }
 
@@ -143,10 +223,14 @@ Sys_Rename(const char *from, const char *to)
 }
 
 // removes dir <path> if it is exists
-// <path> is relative or absolute
+// <path> is absolute
 void
 Sys_RemoveDir(const char *path)
 {
+	if (sysLv2FsRmdir(path) != 0) 
+	{
+		printf("Sys_RemoveDir: can't remove dir: '%s'", path);
+	}
 }
 
 // writes return of realpath(3) (<in>, NULL)
@@ -156,6 +240,7 @@ Sys_RemoveDir(const char *path)
 qboolean
 Sys_Realpath(const char *in, char *out, size_t size)
 {
+	// FIXME: realpath not wokring
 	return false;
 }
 
