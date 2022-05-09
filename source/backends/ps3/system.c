@@ -10,7 +10,7 @@
 
 #include <sys/cdefs.h>
 
-// replacing it here for compatability with yq2's common2.h
+// replacing it here for compatability with yq2's common.h
 #ifdef CFGDIR
 #undef CFGDIR
 #endif
@@ -30,10 +30,10 @@ Sys_Error(char *error, ...)
 	/* change stdin to non blocking */
 	// fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) & ~FNDELAY);
 
-// #ifndef DEDICATED_ONLY
-	// CL_Shutdown();
-// #endif
-	// Qcommon_Shutdown();
+#ifndef DEDICATED_ONLY
+	CL_Shutdown();
+#endif
+	Qcommon_Shutdown();
 
 	va_start(argptr, error);
 	vsnprintf(string, 1024, error, argptr);
@@ -45,9 +45,9 @@ Sys_Error(char *error, ...)
 
 void Sys_Quit(void)
 {
-// #ifndef DEDICATED_ONLY
- 	// CL_Shutdown();
-// #endif
+#ifndef DEDICATED_ONLY
+ 	CL_Shutdown();
+#endif
 
 	// if (logfile)
 	// {
@@ -55,7 +55,7 @@ void Sys_Quit(void)
 	// 	logfile = NULL;
 	// }
 
-	// Qcommon_Shutdown();
+	Qcommon_Shutdown();
 	// fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) & ~FNDELAY);
 
 	printf("------------------------------------\n");
@@ -435,12 +435,15 @@ static char findpattern[MAX_OSPATH];
 
 char *Sys_FindFirst(char *path, unsigned musthave, unsigned canthave)
 {
+	Com_Printf("Sys_FindFirst(%s, ...)", path);
+	Com_Printf("Sys_FindFirst not implemented\n");
 	// FIXME Implement Sys_FindFirst
 	return NULL;
 }
 
 char *Sys_FindNext(unsigned musthave, unsigned canthave)
 {
+	Com_Printf("Sys_FindNext not implemented\n");
 	// FIXME Implement Sys_FindNext
 	return NULL;
 }
@@ -448,5 +451,6 @@ char *Sys_FindNext(unsigned musthave, unsigned canthave)
 // NOT TESTED
 void Sys_FindClose(void)
 {
+	Com_Printf("Sys_FindClose not implemented\n");
 	// FIXME Implement Sys_FindClose
 }

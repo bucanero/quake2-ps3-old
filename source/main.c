@@ -36,7 +36,10 @@
 #include <SDL2/SDL.h>
 
 #include "OpenGLES/EGLWrapper.h"
-#include "ps3/system.h"
+
+#include "common/header/common.h"
+
+#include "backends/ps3/test_system.h"
 
 // Test program fills these in:
 extern const char * rsxgltest_name;
@@ -332,20 +335,26 @@ appCleanup()
 
 int main(int argc, const char** argv)
 {
-    Sys_Init();
     netInitialize();
     tcp_init();
     tcp_printf("%s\n",rsxgltest_name);
 
-    int sdlStat = SDL_Init(SDL_INIT_TIMER);
-    if (sdlStat != 0) {
-        printf("SDL_Init failed: %s\n", SDL_GetError());
-    }
+    // int sdlStat = SDL_Init(SDL_INIT_TIMER);
+    // if (sdlStat != 0) {
+    //     printf("SDL_Init failed: %s\n", SDL_GetError());
+    // }
 
-    SDL_version linked;
-    SDL_GetVersion(&linked);
-    printf("linking against SDL version %u.%u.%u.\n",
-        linked.major, linked.minor, linked.patch);
+    // SDL_version linked;
+    // SDL_GetVersion(&linked);
+    // printf("linking against SDL version %u.%u.%u.\n",
+    //     linked.major, linked.minor, linked.patch);
+
+
+
+    TestSys();
+    Qcommon_Init(argc, argv);
+    Sys_Error("test");
+    return 0;
 
     // NOTE: these configs are identical with example but not used in eglwInitialize
     EglwConfigInfo cfgiMinimal;
