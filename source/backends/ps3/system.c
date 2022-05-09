@@ -1,24 +1,66 @@
 // system.c for PSL1GHT
 
-// #include "../../common/header/common.h"
-#include "system.h"
+#include "../../common/header/common.h"
 
-#include <stdio.h>
 #include <ppu-lv2.h>
 #include <lv2/syscalls.h>
 
 #include <sys/file.h>
 #include <sys/stat.h>
 
+#include <sys/cdefs.h>
+
+// replacing it here for compatability with yq2's common2.h
+#ifdef CFGDIR
+#undef CFGDIR
+#endif
+#define CFGDIR "USRDIR"
+
+// Config dir
+char cfgdir[MAX_OSPATH] = CFGDIR;
+
+/* ================================================================ */
+
 void 
 Sys_Error(char *error, ...)
 {
-	// FIXME Implement Sys_Quit
+	va_list argptr;
+	char string[1024];
+
+	/* change stdin to non blocking */
+	// fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) & ~FNDELAY);
+
+// #ifndef DEDICATED_ONLY
+	// CL_Shutdown();
+// #endif
+	// Qcommon_Shutdown();
+
+	va_start(argptr, error);
+	vsnprintf(string, 1024, error, argptr);
+	va_end(argptr);
+	fprintf(stderr, "Error: %s\n", string);
+
+	exit(1);
 }
 
 void Sys_Quit(void)
 {
-	// FIXME Implement Sys_Quit
+// #ifndef DEDICATED_ONLY
+ 	// CL_Shutdown();
+// #endif
+
+	// if (logfile)
+	// {
+	// 	fclose(logfile);
+	// 	logfile = NULL;
+	// }
+
+	// Qcommon_Shutdown();
+	// fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) & ~FNDELAY);
+
+	printf("------------------------------------\n");
+
+	exit(0);
 }
 
 void 
@@ -120,20 +162,29 @@ Sys_Nanosleep(int nanosec)
 //  Filesytem
 // ---------------------------------------------
 
-#define PS3_PATH_MAX 256
-
-// /absolute/path/to/directory
+// /absolute/path/to/directory[/]
 void 
 Sys_Mkdir(const char *path)
 {
 	// code based on one in apollo's savetool
 	
-	char fullpath[PS3_PATH_MAX];
+	char fullpath[MAX_OSPATH];
 
 	//snprintf(fullpath, sizeof(fullpath), "%s", path);
-	strlcpy(fullpath, path, PS3_PATH_MAX);
+	strlcpy(fullpath, path, MAX_OSPATH);
 
-    char* ptr = fullpath;
+	// remove trailing '/'
+	char* ptr = fullpath;
+	while (*ptr != '\0')
+	{
+		++ptr;
+	}
+	--ptr;
+	if (*ptr == '/')
+	{
+		*ptr = '\0';
+	}
+	ptr = fullpath;
 
 	// creating path to directory
 	while (*ptr)
@@ -147,7 +198,6 @@ Sys_Mkdir(const char *path)
         char last = *ptr;
 		*ptr = 0;
 
-		printf("%s\n", fullpath);
         if (Sys_IsDir(fullpath) == false)
         {
             if (mkdir(fullpath, 0777) < 0)
@@ -196,14 +246,27 @@ Sys_IsFile(const char *path)
 }
 
 // returns null terminated string -- path to
-// config directory should end with .YQ2
-// which is set at <cfgdir> variable and
-// defined in macro CFGDIR
+// config directory should end with '<cfgdir>/'
+// variable whichi is defined in macro CFGDIR
 char*
 Sys_GetHomeDir(void)
 {
-	// FIXME Implement Sys_GetHomeDir
-	return NULL;
+	static char homedir[MAX_OSPATH];
+	static const char* home = "/dev_hdd0/game/QUAKE2";
+
+	snprintf(homedir, sizeof(homedir), "%s/%s/", home, cfgdir);
+	Sys_Mkdir(homedir);
+
+	return homedir;
+}
+
+const char* Sys_GetBinaryDir()
+{
+	/* We don't load any libraries at runtime so we use this trick
+       to not allow filesystem to add this path to search base, but
+	   vid.c still needed to be changed for single file build.
+	   Also this used in portable run which should not be allowed. */
+	return "\0";
 }
 
 // See remove(3)
@@ -229,7 +292,7 @@ Sys_RemoveDir(const char *path)
 {
 	if (sysLv2FsRmdir(path) != 0) 
 	{
-		printf("Sys_RemoveDir: can't remove dir: '%s'", path);
+		printf("Sys_RemoveDir: can't remove dir: '%s'\n", path);
 	}
 }
 
@@ -240,8 +303,63 @@ Sys_RemoveDir(const char *path)
 qboolean
 Sys_Realpath(const char *in, char *out, size_t size)
 {
-	// FIXME: realpath not wokring
-	return false;
+	// Block off relative paths
+	if (strstr(in, "..") != NULL)
+	{
+		Com_Printf("WARNING: Sys_Realpath2: refusing to solve relative path '%s'.\n", in);
+		return false;
+	}
+
+	// Absolute paths remain the same
+	// TODOOOO: /path/././dir_in_path/
+	// TODO: Move to separate function
+	if (in[0] == '/')
+    {
+		int len = Q_strlcpy(out, in, size);
+		//size_t len = strlcpy(out, in, size);
+		// But we remove last forwarslash
+		if (out[len-1] == '/')
+		{
+			out[len-1] = '\0';
+		}
+		return Sys_IsDir(out);
+	}
+
+	size_t path_start = 0;
+	if (in[0] == '.' && (in[1] == '/' || in[1] == '\0'))
+	{
+		++path_start;
+		if (in[1] == '/')
+		{
+			++path_start;
+		}
+	}
+
+	char* buf = malloc(size);
+	Sys_GetWorkDir(buf, size);
+	if (buf[0] == '\0')
+	{
+		Com_Printf("WARNING: Sys_Realpath2: Sys_GetWorkDir returned null string.\n");
+		free(buf);
+		return false;
+	}
+	char* bufend = buf;
+	size_t freespace = size; 
+
+	while (*bufend)
+	{
+		++bufend;
+		--freespace;
+	}
+	Q_strlcpy(bufend, &in[path_start], freespace);
+	// strlcpy(bufend, &in[path_start], freespace);
+
+	// Threat buf as absolute path by calling
+	// recursively itself.
+	qboolean ret = Sys_Realpath(buf, out, size);
+
+	free(buf);
+	return ret;
 }
 
 
@@ -268,12 +386,26 @@ Sys_Realpath(const char *in, char *out, size_t size)
 //  Process location
 // ---------------------------------------------
 
+/* This functions are used in server savegame read/write 
+   functions. In YQ2 8.02pre game switches it's working
+   directory to save path and then saves/read files at ./<name>
+   after that switches back to orig WorkDir 
+   So both functions could ignored which is leads to
+   saving save/read files on default running directory.
+   I don't know where is it. */
+
 // writes YQ2's working directory path* 
 // to <buffer> up to <len> bytes
 // *path should be null terminated
 void
 Sys_GetWorkDir(char *buffer, size_t len)
 {
+	if (getcwd(buffer, len) != 0)
+	{
+		return;
+	}
+
+	buffer[0] = '\0';
 }
 
 // Sets YQ2's working directory to <path>
@@ -282,5 +414,39 @@ Sys_GetWorkDir(char *buffer, size_t len)
 qboolean
 Sys_SetWorkDir(char *path)
 {
+	if (chdir(path) == 0)
+	{
+		return true;
+	}
+
 	return false;
+}
+
+/* ================================================================ */
+
+/* The musthave and canhave arguments are unused in YQ2. We
+   can't remove them since Sys_FindFirst() and Sys_FindNext()
+   are defined in shared.h and may be used in custom game DLLs. */
+
+static char findbase[MAX_OSPATH];
+static char findpath[MAX_OSPATH];
+static char findpattern[MAX_OSPATH];
+// static DIR *fdir;
+
+char *Sys_FindFirst(char *path, unsigned musthave, unsigned canthave)
+{
+	// FIXME Implement Sys_FindFirst
+	return NULL;
+}
+
+char *Sys_FindNext(unsigned musthave, unsigned canthave)
+{
+	// FIXME Implement Sys_FindNext
+	return NULL;
+}
+
+// NOT TESTED
+void Sys_FindClose(void)
+{
+	// FIXME Implement Sys_FindClose
 }
