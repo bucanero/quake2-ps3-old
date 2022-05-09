@@ -1,6 +1,7 @@
 // system.c for PSL1GHT
 
 #include "../../common/header/common.h"
+#include "../../common/header/glob.h"
 
 #include <ppu-lv2.h>
 #include <lv2/syscalls.h>
@@ -431,26 +432,146 @@ Sys_SetWorkDir(char *path)
 static char findbase[MAX_OSPATH];
 static char findpath[MAX_OSPATH];
 static char findpattern[MAX_OSPATH];
-// static DIR *fdir;
+static s32 fdir = -1;
 
+
+// /dev_hdd0/game/QUAKE2/USRDIR/baseq2/*.pak - should open
+// /dev_hdd0/game/baseq2/*.pak - should not open (return NULL)
 char *Sys_FindFirst(char *path, unsigned musthave, unsigned canthave)
 {
-	Com_Printf("Sys_FindFirst(%s, ...)", path);
-	Com_Printf("Sys_FindFirst not implemented\n");
-	// FIXME Implement Sys_FindFirst
+	sysFSDirent entry;
+	// entry.d_type
+	// files -> 0x02
+	// dirs  -> 0x01
+
+	char* ptr;
+
+	// Block off relative paths
+	if (strstr(path, "..") != NULL)
+	{
+		Com_Printf("WARNING: Sys_FindFirst: relative paths not allowed '%s'.\n", path);
+		return NULL;
+	}
+
+	if (fdir >= 0)
+	{
+		Com_Printf("WARNING: Sys_FindFirst: without closing previous search, closing...\n");
+		Sys_FindClose();
+	}
+
+	strcpy(findbase, path);
+
+	if ((ptr = strrchr(findbase, '/')) != NULL)
+	{
+		*ptr = 0;
+		strcpy(findpattern, ptr + 1);
+		if (strcmp(findpattern, "*.*") == 0)
+		{
+			strcpy(findpattern, "*");
+		}
+	}
+	else
+	{
+		strcpy(findpattern, "*");
+	}
+
+	// /dev_hdd0/game/QUAKE2/USRDIR/baseq2/ - fdir > 0
+	// /dev_hdd0/game/QUAKE2/USRDIR/baseq2/not_existing*msa!%#@ - fdir < 0
+	sysLv2FsOpenDir(findbase, &fdir);
+	if (fdir < 0)
+	{
+		// Com_Printf("WARNING: Sys_FindFirst: could not open search directory '%s'\n", findbase);
+		return NULL;
+	}
+
+	u64 readn = 0; 
+	// 0 - '.' -> 0x102 - '..' -> 0x102 - 'file.pak -> 0x102 - 'scrnshot' -> 0x102 - EOF -> 0
+
+	while (true)
+	{
+		sysLv2FsReadDir(fdir, &entry, &readn);
+		if (readn != 0x102)
+		{
+			break;
+		}
+		if (!*findpattern || glob_match(findpattern, entry.d_name))
+		{
+			if ((strcmp(entry.d_name, ".") != 0) || (strcmp(entry.d_name, "..") != 0))
+			{
+				// Safe way to create path
+
+				int c_cnt = MAX_OSPATH;
+				int n_cpd;
+				ptr = findpath;
+
+				n_cpd = Q_strlcpy(ptr, findbase, c_cnt);
+				ptr += n_cpd;
+				c_cnt -= n_cpd;
+
+				n_cpd = Q_strlcpy(ptr, "/", c_cnt);
+				ptr += n_cpd;
+				c_cnt -= n_cpd;
+
+				Q_strlcpy(ptr, entry.d_name, c_cnt);
+				return findpath;
+			}
+		}
+	}
+
 	return NULL;
 }
 
 char *Sys_FindNext(unsigned musthave, unsigned canthave)
 {
-	Com_Printf("Sys_FindNext not implemented\n");
-	// FIXME Implement Sys_FindNext
+	sysFSDirent entry;
+	u64 readn = 0; 
+
+	if (fdir < 0)
+	{
+		Com_Printf("WARNING: Sys_FindNext: search not started\n");
+		return NULL;
+	}
+
+	while (true)
+	{
+		sysLv2FsReadDir(fdir, &entry, &readn);
+		if (readn != 0x102)
+		{
+			break;
+		}
+		if (!*findpattern || glob_match(findpattern, entry.d_name))
+		{
+			if ((strcmp(entry.d_name, ".") != 0) || (strcmp(entry.d_name, "..") != 0))
+			{
+				// Safe way to create path
+
+				int c_cnt = MAX_OSPATH;
+				int n_cpd;
+				char* ptr = findpath;
+
+				n_cpd = Q_strlcpy(ptr, findbase, c_cnt);
+				ptr += n_cpd;
+				c_cnt -= n_cpd;
+
+				n_cpd = Q_strlcpy(ptr, "/", c_cnt);
+				ptr += n_cpd;
+				c_cnt -= n_cpd;
+
+				Q_strlcpy(ptr, entry.d_name, c_cnt);
+				return findpath;
+			}
+		}
+	}
+
 	return NULL;
 }
 
-// NOT TESTED
 void Sys_FindClose(void)
 {
-	Com_Printf("Sys_FindClose not implemented\n");
-	// FIXME Implement Sys_FindClose
+	if (fdir >= 0)
+	{
+		sysLv2FsCloseDir(fdir);
+	}
+		
+	fdir = -1;
 }

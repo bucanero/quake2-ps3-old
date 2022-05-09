@@ -31,10 +31,7 @@
 // FIXME
 #define SV_Shutdown(s_val, val) printf(s_val)
 #define CL_Shutdown()
-cvar_t *developer;
-cvar_t *modder;
 #define Con_Print(s_val) printf(s_val)
-#define FS_Gamedir( ) ""
 #define CL_Drop()
 // FIXend
 

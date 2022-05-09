@@ -46,3 +46,58 @@ int TestSys()
 	printf("TestSys done\n");
 	return 0;
 }
+
+
+int TestFindSys()
+{
+	char* ret = Sys_FindFirst("/dev_hdd0/game/QUAKE2/USRDIR/baseq2/*.pak", 0, 0);
+	if (ret == NULL)
+	{
+		printf("0 Sys_FindFirst returned NULL\n");
+	}
+	else
+	{
+		printf("0 Sys_FindFirst returned '%s'\n", ret);
+	}
+
+	ret = Sys_FindFirst("/dev_hdd0/game/QUAKE2/USRDIR/baseq2/*.pak", 0, 0);
+	if (ret == NULL)
+	{
+		printf("1 Sys_FindFirst returned NULL\n");
+	}
+	else
+	{
+		printf("1 Sys_FindFirst returned '%s'\n", ret);
+	}
+
+	ret = Sys_FindNext(0, 0);
+	if (ret == NULL)
+	{
+		printf("0 Sys_FindNext returned NULL\n");
+	}
+	else
+	{
+		printf("0 Sys_FindNext returned '%s'\n", ret);
+	}
+	ret = Sys_FindNext(0, 0);
+	if (ret == NULL)
+	{
+		printf("1 Sys_FindNext returned NULL\n");
+	}
+	else
+	{
+		printf("1 Sys_FindNext returned '%s'\n", ret);
+	}
+
+	Sys_FindClose();
+
+	ret = Sys_FindFirst("/dev_hdd0/game/baseq2/*.pak", 0, 0);
+	if (ret == NULL)
+	{
+		printf("2 Sys_FindFirst returned NULL\n");
+	}
+	else
+	{
+		printf("2 Sys_FindFirst returned '%s'\n", ret);
+	}
+}

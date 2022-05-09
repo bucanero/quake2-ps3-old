@@ -350,8 +350,7 @@ int main(int argc, const char** argv)
     //     linked.major, linked.minor, linked.patch);
 
 
-
-    TestSys();
+    Sys_SetWorkDir("/dev_hdd0/game/QUAKE2");
     Qcommon_Init(argc, argv);
     Sys_Error("test");
     return 0;
