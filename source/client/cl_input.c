@@ -26,8 +26,8 @@
  */
 
 #include "header/client.h"
-// #include "input/header/input.h"
-// FIXME input
+#include "input/header/input.h"
+
 int sys_frame_time;
 
 cvar_t *cl_nodelta;

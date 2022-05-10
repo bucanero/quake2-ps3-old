@@ -25,8 +25,7 @@
  */
 
 #include "header/client.h"
-// #include "input/header/input.h"
-// FIXME input
+#include "input/header/input.h"
 
 /* development tools for weapons */
 int gun_frame;

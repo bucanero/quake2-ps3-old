@@ -25,8 +25,7 @@
  */
 
 #include "header/client.h"
-// #include "input/header/input.h"
-// FIXME input
+#include "input/header/input.h"
 
 void CL_DownloadFileName(char *dest, int destlen, char *fn);
 void CL_ParseDownload(void);

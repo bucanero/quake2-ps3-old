@@ -26,8 +26,7 @@
  */
 
 #include "header/client.h"
-// #include "input/header/input.h"
-// FIXME input
+#include "input/header/input.h"
 
 void CL_ForwardToServer_f(void);
 void CL_Changing_f(void);

@@ -28,8 +28,7 @@
 #include <limits.h>
 
 #include "header/client.h"
-// #include "input/header/input.h"
-// FIXME input
+#include "input/header/input.h"
 
 extern cvar_t *vid_renderer;
 

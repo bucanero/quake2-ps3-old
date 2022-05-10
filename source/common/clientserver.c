@@ -28,12 +28,6 @@
 #include <stdlib.h>
 #include <setjmp.h>
 
-// FIXME client
-#define CL_Shutdown()
-#define Con_Print(s_val) printf(s_val)
-#define CL_Drop()
-// FIXend
-
 #define MAXPRINTMSG 4096
 
 FILE *logfile;
