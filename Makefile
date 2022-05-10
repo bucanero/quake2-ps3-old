@@ -20,7 +20,30 @@ BUILD		:=	build
 SOURCES		:=	source source/infolder source/OpenGLES source/backends/ps3 source/client/vid source/common/shared \
                 source/client/sound \
 				source/common/unzip \
-				source/common
+				source/common \
+				source/game/monster/berserker \
+				source/game/monster/boss2 \
+				source/game/monster/boss3 \
+				source/game/monster/brain \
+				source/game/monster/chick \
+				source/game/monster/flipper \
+				source/game/monster/float \
+				source/game/monster/flyer \
+				source/game/monster/gladiator \
+				source/game/monster/gunner \
+				source/game/monster/hover \
+				source/game/monster/infantry \
+				source/game/monster/insane \
+				source/game/monster/medic \
+				source/game/monster/misc \
+				source/game/monster/mutant \
+				source/game/monster/parasite \
+				source/game/monster/soldier \
+				source/game/monster/supertank \
+				source/game/monster/tank \
+				source/game/player \
+				source/game/savegame \
+				source/game
 DATA		:=	data
 INCLUDES	:=	include $(PS3DEV)/portlibs/ppu/include
 
