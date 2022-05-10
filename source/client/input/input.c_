@@ -278,7 +278,7 @@ void IN_Shutdown(void)
 }
 
 #define SIMPLE_MAP(PAD_KEY, QKEY) \
-if (last_paddata[i].PAD_KEY != paddata.PAD_KEY)\
+if (pad_archive[i].PAD_KEY != paddata.PAD_KEY)\
 {\
 	Key_Event(QKEY, paddata.PAD_KEY, true);\
 }
@@ -288,38 +288,56 @@ void IN_Update(void)
 	padInfo padinfo;
 	padData paddata;
 
-	static padData last_paddata[MAX_PADS];
+	static padData pad_archive[MAX_PADS];
 
 	ioPadGetInfo(&padinfo);
 	for(int i = 0; i < MAX_PADS; ++i)
 	{
-		if(padinfo.status[i])
+		if(padinfo.status[i] == 0)
 		{
-			ioPadGetData(i, &paddata);
-
-			// padData diff = IN_comparePadData(last_paddata[i], paddata);
-
-			SIMPLE_MAP(BTN_START, K_ESCAPE)
-			SIMPLE_MAP(BTN_CROSS, K_ENTER)
-
-			SIMPLE_MAP(BTN_UP, K_UPARROW)
-			SIMPLE_MAP(BTN_DOWN, K_DOWNARROW)
-			SIMPLE_MAP(BTN_LEFT, K_LEFTARROW)
-			SIMPLE_MAP(BTN_RIGHT, K_RIGHTARROW)
-
-			SIMPLE_MAP(BTN_R1, K_CTRL)
-
-			// SIMPLE_MAP(BTN_TRIANGLE, K_SC_W)
-			if (last_paddata[i].BTN_TRIANGLE != paddata.BTN_TRIANGLE)
-			{
-				Key_Event(K_MOUSE3, paddata.BTN_TRIANGLE, false);
-			}
-
-			//SIMPLE_MAP(BTN_R2, K_CTRL)
-			
-			last_paddata[i] = paddata;
+			continue;
 		}
+		if (ioPadGetData(i, &paddata) != 0 )
+		{
+			continue;
+		}
+
+		if (paddata.len < 8)
+		{
+			break;
+		}
+
+		SIMPLE_MAP(BTN_SELECT,   K_JOY_BACK);
+		SIMPLE_MAP(BTN_START,    K_JOY5);
+
+		// SIMPLE_MAP(BTN_LEFT,     K_JOY1);
+		// SIMPLE_MAP(BTN_DOWN,     K_JOY2);
+		// SIMPLE_MAP(BTN_RIGHT,    K_JOY3);
+		// SIMPLE_MAP(BTN_UP,       K_JOY4);
+		SIMPLE_MAP(BTN_LEFT,     K_LEFTARROW);
+		SIMPLE_MAP(BTN_DOWN,     K_DOWNARROW);
+		SIMPLE_MAP(BTN_RIGHT,    K_RIGHTARROW);
+		SIMPLE_MAP(BTN_UP,       K_UPARROW);
+
+		SIMPLE_MAP(BTN_SQUARE,   K_JOY9);
+		// SIMPLE_MAP(BTN_CROSS,    K_JOY10);
+		SIMPLE_MAP(BTN_CROSS,    K_ENTER);
+		SIMPLE_MAP(BTN_CIRCLE,   K_JOY11);
+		SIMPLE_MAP(BTN_TRIANGLE, K_JOY12);
+
+		SIMPLE_MAP(BTN_R1,       K_JOY13);
+		SIMPLE_MAP(BTN_L1,       K_JOY14);
+
+		SIMPLE_MAP(BTN_R2,       K_JOY15);
+		SIMPLE_MAP(BTN_L2,       K_JOY16);
+
+		SIMPLE_MAP(BTN_R3,       K_JOY6);
+		SIMPLE_MAP(BTN_L3,       K_JOY7);
+
+		pad_archive[i] = paddata;
 	}
+
+	sys_frame_time = Sys_Milliseconds();
 }
 
 void In_FlushQueue(void)
