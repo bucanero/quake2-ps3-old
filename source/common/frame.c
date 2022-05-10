@@ -37,17 +37,6 @@ void SV_Frame(int usec)
 {
 	Com_Printf("SV_Frame not implemented\n");
 }
-// FIXME backend network.c
-void NET_Init(void)
-{
-	Com_Printf("NET_Init not implemented\n");
-}
-
-// FIXME netchan.c
-void Netchan_Init(void)
-{
-	Com_Printf("Netchan_Init not implemented\n");
-}
 
 // FIXME cl_keyboard.c
 void Key_Init(void)
