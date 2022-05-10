@@ -43,7 +43,8 @@ SOURCES		:=	source source/infolder source/OpenGLES source/backends/ps3 source/cl
 				source/game/monster/tank \
 				source/game/player \
 				source/game/savegame \
-				source/game
+				source/game \
+				source/server
 DATA		:=	data
 INCLUDES	:=	include $(PS3DEV)/portlibs/ppu/include
 

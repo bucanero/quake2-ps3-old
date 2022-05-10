@@ -29,9 +29,6 @@
 
 #include "header/common.h"
 
-// FIXME sv_main.c
-cvar_t *sv_entfile;
-
 typedef struct
 {
 	cplane_t	*plane;

@@ -28,8 +28,7 @@
 #include <stdlib.h>
 #include <setjmp.h>
 
-// FIXME
-#define SV_Shutdown(s_val, val) printf(s_val)
+// FIXME client
 #define CL_Shutdown()
 #define Con_Print(s_val) printf(s_val)
 #define CL_Drop()

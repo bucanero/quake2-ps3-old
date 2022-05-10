@@ -28,16 +28,6 @@
 #include "header/zone.h"
 #include <setjmp.h>
 
-// FIXME server.c
-void SV_Init(void)
-{
-	Com_Printf("SV_Init not implemented\n");
-}
-void SV_Frame(int usec)
-{
-	Com_Printf("SV_Frame not implemented\n");
-}
-
 // FIXME cl_keyboard.c
 void Key_Init(void)
 {
@@ -705,8 +695,13 @@ Qcommon_Frame(int usec)
 static void
 Qcommon_Frame(int usec)
 {
+	static int f_counter = 0;
+	if (f_counter > 5000)
+	{
+		Com_Quit();
+	}
 	Com_Printf("we are in the fucking server loooopoooop!\n");
-	Com_Quit();
+	++f_counter;
 	// For the dedicated server terminal console.
 	char *s;
 
