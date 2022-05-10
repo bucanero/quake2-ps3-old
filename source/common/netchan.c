@@ -28,11 +28,6 @@
 
 #include "header/common.h"
 
-// FIXME
-
-
-// FIXend
-
 /*
  * packet header
  * -------------
