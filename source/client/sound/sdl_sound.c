@@ -40,13 +40,6 @@
 #include "../../client/header/client.h"
 #include "../../client/sound/header/local.h"
 
-// FIXME cl_entities.c
-void CL_GetEntitySoundOrigin(int ent, vec3_t org)
-{
-	printf("CL_GetEntitySoundOrigin not implemented");
-}
-
-
 /* Defines */
 #define SDL_PAINTBUFFER_SIZE 2048
 #define SDL_FULLVOLUME 80

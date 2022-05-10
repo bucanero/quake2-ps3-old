@@ -28,19 +28,6 @@
 #include "header/zone.h"
 #include <setjmp.h>
 
-// FIXME cl_keyboard.c
-void Key_Init(void)
-{
-	Com_Printf("Key_Init not implemented");
-}
-
-void Key_Shutdown(void)
-{
-	Com_Printf("Key_Shutdown not implemented");
-}
-
-// FIXend
-
 cvar_t *developer;
 cvar_t *modder;
 cvar_t *timescale;

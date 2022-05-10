@@ -44,27 +44,27 @@ typedef struct {
 extern viddef_t viddef;
 
 // Generic stuff.
-// qboolean VID_HasRenderer(const char *renderer);
-// void	VID_Init(void);
-// void	VID_Shutdown(void);
-// void	VID_CheckChanges(void);
+qboolean VID_HasRenderer(const char *renderer);
+void	VID_Init(void);
+void	VID_Shutdown(void);
+void	VID_CheckChanges(void);
 
-// void	VID_MenuInit(void);
-// void	VID_MenuDraw(void);
-// const char *VID_MenuKey(int);
+void	VID_MenuInit(void);
+void	VID_MenuDraw(void);
+const char *VID_MenuKey(int);
 
 // Stuff provided by platform backend.
-// extern int glimp_refreshRate;
+extern int glimp_refreshRate;
 
-// const char **GLimp_GetDisplayIndices(void);
-// int GLimp_GetWindowDisplayIndex(void);
-// int GLimp_GetNumVideoDisplays(void);
+const char **GLimp_GetDisplayIndices(void);
+int GLimp_GetWindowDisplayIndex(void);
+int GLimp_GetNumVideoDisplays(void);
 qboolean GLimp_Init(void);
-// void GLimp_Shutdown(void);
-// qboolean GLimp_InitGraphics(int fullscreen, int *pwidth, int *pheight);
-// void GLimp_ShutdownGraphics(void);
-// void GLimp_GrabInput(qboolean grab);
-// int GLimp_GetRefreshRate(void);
-// qboolean GLimp_GetDesktopMode(int *pwidth, int *pheight);
+void GLimp_Shutdown(void);
+qboolean GLimp_InitGraphics(int fullscreen, int *pwidth, int *pheight);
+void GLimp_ShutdownGraphics(void);
+void GLimp_GrabInput(qboolean grab);
+int GLimp_GetRefreshRate(void);
+qboolean GLimp_GetDesktopMode(int *pwidth, int *pheight);
 
 #endif

@@ -18,10 +18,9 @@ include $(PSL1GHT)/ppu_rules
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source \
+				source/backends/ps3/shared \
 				source/backends/ps3 \
-				source/client/vid \
 				source/common/shared \
-                source/client/sound \
 				source/common/unzip \
 				source/common \
 				source/game/monster/berserker \
@@ -47,7 +46,15 @@ SOURCES		:=	source \
 				source/game/player \
 				source/game/savegame \
 				source/game \
-				source/server
+				source/server \
+				source/client/curl \
+				source/client/input \
+				source/client/menu \
+				source/client/refresh/files \
+				source/client/refresh/soft \
+				source/client/sound \
+				source/client/vid \
+				source/client
 DATA		:=	data
 INCLUDES	:=	include $(PS3DEV)/portlibs/ppu/include
 
@@ -60,7 +67,7 @@ CONTENTID	:=	UP0001-$(APPID)_00-0000000000000000
 #---------------------------------------------------------------------------------
 
 #CFLAGS		=	-O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEIGEN2_SUPPORT
-CFLAGS = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEGLW_GLES2 -DIOAPI_NO_64 -DDEDICATED_ONLY -DYQ2OSTYPE=\"GameOS\" -DYQ2ARCH=\"PS3\" -DUNICORE -I/opt/X11/include
+CFLAGS = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEGLW_GLES2 -DIOAPI_NO_64 -DYQ2OSTYPE=\"GameOS\" -DYQ2ARCH=\"PS3\" -DUNICORE -I/opt/X11/include
 
 #CXXFLAGS	=	$(CFLAGS)
 CXXFLAGS = $(CFLAGS) -std=c++11 

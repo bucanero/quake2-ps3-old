@@ -33,24 +33,6 @@
 #include "header/qal.h"
 #include "header/vorbis.h"
 
-// FIXME  cl_main.c
-centity_t cl_entities[MAX_EDICTS];
-client_static_t cls;
-client_state_t cl;
-entity_state_t cl_parse_entities[MAX_PARSE_ENTITIES];
-cvar_t *cl_paused;
-
-void
-Haptic_Feedback(char *name, int effect_volume, int effect_duration,
-			   int effect_begin, int effect_end,
-			   int effect_attack, int effect_fade,
-			   int effect_x, int effect_y, int effect_z)
-{
-	Com_Error(ERR_FATAL, "Haptic_Feedback not implemnted");
-}
-
-// FIXend
-
 /* During registration it is possible to have more sounds
    than could actually be referenced during gameplay,
    because we don't want to free anything until we are
