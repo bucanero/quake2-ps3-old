@@ -30,8 +30,7 @@
 #define CO_COMMON_H
 
 #include "shared.h"
-// FIXME crc.h
-// #include "crc.h"
+#include "crc.h"
 
 #define YQ2VERSION "8.02pre"
 #define BASEDIRNAME "baseq2"
