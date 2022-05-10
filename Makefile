@@ -17,7 +17,10 @@ include $(PSL1GHT)/ppu_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/infolder source/OpenGLES source/backends/ps3 source/client/vid source/common/shared \
+SOURCES		:=	source \
+				source/backends/ps3 \
+				source/client/vid \
+				source/common/shared \
                 source/client/sound \
 				source/common/unzip \
 				source/common \
