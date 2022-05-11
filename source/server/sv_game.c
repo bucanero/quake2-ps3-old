@@ -449,7 +449,7 @@ SV_InitGameProgs(void)
 	import.AreasConnected = CM_AreasConnected;
 
 #ifdef UNICORE
-	ge = GetGameAPI(&import);
+	ge = (game_export_t*)GetGameAPI(&import);
 
 	if (!ge)
 	{
