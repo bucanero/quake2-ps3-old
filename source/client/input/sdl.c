@@ -30,6 +30,8 @@
 #include <SDL2/SDL.h>
 #include <limits.h>
 
+#include <io/pad.h>
+
 #include "header/input.h"
 #include "../../client/header/keyboard.h"
 #include "../../client/header/client.h"
@@ -424,6 +426,166 @@ IN_TranslateScancodeToQ2Key(SDL_Scancode sc)
 
 /* ------------------------------------------------------------------ */
 
+static inline void
+IN_adjustJoyDirection(const unsigned int rawAxisValue, const char* direction, const float _threshold)
+{
+	// Com_Printf("IN_adjustJoyDirection rawAxisValue: 0x%04X direction: %s threshold: %0.4f\n", rawAxisValue, direction, _threshold);
+	int axis_value; // [-128, 127]
+	//Com_Printf("IN_adjustJoyDirection base axis_value: %d\n", axis_value);
+	float fix_value;
+	float threshold;
+	if (_threshold > 0.9)
+	{
+		threshold = 0.9;
+	}
+	else
+	{
+		threshold = _threshold;
+	}
+	// Com_Printf("IN_adjustJoyDirection threshold: %0.04f\n", threshold);
+
+
+	float axe_range_value = rawAxisValue;
+	axe_range_value  /= 255.0f;
+	axe_range_value -= 0.5f;
+	axe_range_value /= 0.5f;
+	axe_range_value = axe_range_value > 0.0f ? axe_range_value : -axe_range_value;
+
+	// fix_value = ((float) abs(rawAxisValue) / 255.0f - threshold) / (1.0f - threshold);
+	fix_value = (axe_range_value - threshold) / (1.0f - threshold);
+	// Com_Printf("IN_adjustJoyDirection base fix_value: %0.04f\n", fix_value);
+
+	if (fix_value < 0.0f)
+	{
+		fix_value = 0.0f;
+	}
+	// Com_Printf("IN_adjustJoyDirection adjust fix_value: %0.04f\n", fix_value);
+
+	// Apply expo
+	fix_value = pow(fix_value, joy_expo->value);
+	// Com_Printf("IN_adjustJoyDirection final fix_value: %0.04f\n", fix_value);
+
+	axis_value = (int) (32767 * ((rawAxisValue < 0x7F) ? -fix_value : fix_value));
+	// Com_Printf("IN_adjustJoyDirection final axis_value: %d\n", axis_value);
+
+	if (cls.key_dest == key_game && (int) cl_paused->value == 0)
+	{
+		     if (strcmp(direction, "sidemove") == 0)
+		{
+			joystick_sidemove = axis_value * joy_sidesensitivity->value;
+
+			// We need to be twice faster because with joystic we run...
+			joystick_sidemove *= cl_sidespeed->value * 2.0f;
+		}
+		else if (strcmp(direction, "forwardmove") == 0)
+		{
+			joystick_forwardmove = axis_value * joy_forwardsensitivity->value;
+
+			// We need to be twice faster because with joystic we run...
+			joystick_forwardmove *= cl_forwardspeed->value * 2.0f;
+		}
+		else if (strcmp(direction, "yaw") == 0)
+		{
+			joystick_yaw = axis_value * joy_yawsensitivity->value;
+			joystick_yaw *= cl_yawspeed->value;
+		}
+		else if (strcmp(direction, "pitch") == 0)
+		{
+			joystick_pitch = axis_value * joy_pitchsensitivity->value;
+			joystick_pitch *= cl_pitchspeed->value;
+		}
+		else if (strcmp(direction, "updown") == 0)
+		{
+			joystick_up = axis_value * joy_upsensitivity->value;
+			joystick_up *= cl_upspeed->value;
+		}
+	}
+
+	static qboolean left_trigger = false;
+	static qboolean right_trigger = false;
+
+	if (strcmp(direction, "triggerleft") == 0)
+	{
+		qboolean new_left_trigger = abs(axis_value) > (32767 / 4);
+
+		if (new_left_trigger != left_trigger)
+		{
+			left_trigger = new_left_trigger;
+			Key_Event(K_TRIG_LEFT, left_trigger, true);
+		}
+	}
+	else if (strcmp(direction, "triggerright") == 0)
+	{
+		qboolean new_right_trigger = abs(axis_value) > (32767 / 4);
+
+		if (new_right_trigger != right_trigger)
+		{
+			right_trigger = new_right_trigger;
+			Key_Event(K_TRIG_RIGHT, right_trigger, true);
+		}
+	}
+}
+
+static inline void
+IN_adjustAxes(padData paddata)
+{
+	char* direction_type;
+	float threshold;
+	// Left horizontal
+	{
+		direction_type = joy_axis_leftx->string;
+		threshold = joy_axis_leftx_threshold->value;
+		IN_adjustJoyDirection(paddata.ANA_L_H, direction_type, threshold);
+	}
+
+	// Left vertical
+	{
+		direction_type = joy_axis_lefty->string;
+		threshold = joy_axis_lefty_threshold->value;
+		IN_adjustJoyDirection(paddata.ANA_L_V, direction_type, threshold);
+	}
+
+	// Right horizontal
+	{
+		direction_type = joy_axis_rightx->string;
+		threshold = joy_axis_rightx_threshold->value;
+		IN_adjustJoyDirection(paddata.ANA_R_H, direction_type, threshold);
+	}
+
+	// Right vertical
+	{
+		direction_type = joy_axis_righty->string;
+		threshold = joy_axis_righty_threshold->value;
+		IN_adjustJoyDirection(paddata.ANA_R_V, direction_type, threshold);
+	}
+
+	// L2
+	// {
+	// 	Com_Printf("L2: 0x%04X\n", paddata.PRE_L2);
+	// 	direction_type = joy_axis_triggerleft->string;
+	// 	threshold = joy_axis_triggerleft_threshold->value;
+	// 	IN_adjustJoyDirection(paddata.PRE_L2, direction_type, threshold);
+	// }
+
+	// R2
+	// {
+	// 	Com_Printf("R2: 0x%04X\n", paddata.PRE_R2);
+	// 	direction_type = joy_axis_triggerright->string;
+	// 	threshold = joy_axis_triggerright_threshold->value;
+	// 	IN_adjustJoyDirection(paddata.PRE_R2, direction_type, threshold);
+	// }
+
+	// Other presure sensitive buttons could be added as where L2 and R2
+	// If doing so make sure their SIMPLE_MAP macros are removed in
+	// IN_Update
+}
+
+#define SIMPLE_MAP(PAD_KEY, QKEY) \
+if (pad_archive[i].PAD_KEY != paddata.PAD_KEY)\
+{\
+	Key_Event(QKEY, paddata.PAD_KEY, true);\
+}
+
 /*
  * Updates the input queue state. Called every
  * frame by the client and does nearly all the
@@ -431,6 +593,71 @@ IN_TranslateScancodeToQ2Key(SDL_Scancode sc)
  */
 void
 IN_Update(void)
+{
+	padInfo padinfo;
+	padData paddata;
+
+	static padData pad_archive[MAX_PADS];
+
+	ioPadGetInfo(&padinfo);
+	for(int i = 0; i < MAX_PADS; ++i)
+	{
+		if(padinfo.status[i] == 0)
+		{
+			continue;
+		}
+		if (ioPadGetData(i, &paddata) != 0 )
+		{
+			continue;
+		}
+
+		if (paddata.len < 8)
+		{
+			break;
+		}
+
+		SIMPLE_MAP(BTN_SELECT,   K_JOY_BACK);
+		SIMPLE_MAP(BTN_START,    K_JOY5);
+
+		// SIMPLE_MAP(BTN_LEFT,     K_JOY1);
+		// SIMPLE_MAP(BTN_DOWN,     K_JOY2);
+		// SIMPLE_MAP(BTN_RIGHT,    K_JOY3);
+		// SIMPLE_MAP(BTN_UP,       K_JOY4);
+		SIMPLE_MAP(BTN_LEFT,     K_LEFTARROW);
+		SIMPLE_MAP(BTN_DOWN,     K_DOWNARROW);
+		SIMPLE_MAP(BTN_RIGHT,    K_RIGHTARROW);
+		SIMPLE_MAP(BTN_UP,       K_UPARROW);
+
+		SIMPLE_MAP(BTN_SQUARE,   K_JOY9);
+		// SIMPLE_MAP(BTN_CROSS,    K_JOY10);
+		SIMPLE_MAP(BTN_CROSS,    K_ENTER);
+		SIMPLE_MAP(BTN_CIRCLE,   K_JOY11);
+		SIMPLE_MAP(BTN_TRIANGLE, K_JOY12);
+
+		SIMPLE_MAP(BTN_R1,       K_JOY13);
+		SIMPLE_MAP(BTN_L1,       K_JOY14);
+
+		// L2/R2 are ignored b/c YQ2 threat them as axes
+		// See end note in IN_adjustAxes above
+		//
+		// For some reason they are not working as
+		// axes LOL
+		SIMPLE_MAP(BTN_R2,       K_JOY15);
+		SIMPLE_MAP(BTN_L2,       K_JOY16);
+
+		SIMPLE_MAP(BTN_R3,       K_JOY6);
+		SIMPLE_MAP(BTN_L3,       K_JOY7);
+
+		IN_adjustAxes(paddata);
+		
+		pad_archive[i] = paddata;
+	}
+
+	sys_frame_time = Sys_Milliseconds();
+}
+
+void
+IN_Update1(void)
 {
 	qboolean want_grab;
 	SDL_Event event;
@@ -1202,6 +1429,8 @@ Haptic_Feedback(char *name, int effect_volume, int effect_duration,
 void
 IN_Init(void)
 {
+	ioPadInit(7);
+
 	cvar_t *in_sdlbackbutton;
 	int nummappings;
 	char controllerdb[MAX_OSPATH] = {0};
