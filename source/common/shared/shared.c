@@ -1185,6 +1185,52 @@ FILE *Q_fopen(const char *file, const char *mode)
 #else
 #include <sys/stat.h>
 #include <errno.h>
+#if defined(__RSX__)
+/* Looks like fopen in current SDK just wraps syscall 801
+   So it's not supporting 'in folder' paths (not even speaking
+   about relative paths). So we need to precook them using getcwd */
+extern void Sys_GetWorkDir(char *buffer, size_t len);
+
+FILE *Q_fopen(const char *file, const char *mode)
+{
+	// make sure it's a regular file and not a directory or sth, see #394
+	struct stat statbuf;
+
+	// --------
+	/* Solution for non absolute path <file>
+	   sv_save.c uses Sys_SetWorkDir so it's
+	   easier to add one additional compile directive
+	   and relative catch here compared to multiple
+	   changes in sv_save.c or whatever could call
+	   this function with 'slashless' file. */
+	char fullpath[MAX_OSPATH];
+	if (file[0] != '/')
+	{
+		Sys_GetWorkDir(fullpath, sizeof(fullpath));
+		char* ptr = fullpath;
+		size_t counter = 0;
+		while (*ptr != '\0')
+		{
+			++counter;
+			++ptr;
+		}
+		Q_strlcpy(ptr, file, sizeof(fullpath) - counter);
+		Com_Printf("Q_fopen : '%s' ==> '%s'\n", file, fullpath);
+	}
+	else
+	{
+		Q_strlcpy(fullpath, file, sizeof(fullpath));
+	}
+	// --------
+	int statret = stat(fullpath, &statbuf);
+	// (it's ok if it doesn't exist though, maybe we wanna write/create)
+	if((statret == -1 && errno != ENOENT) || (statret == 0 && (statbuf.st_mode & S_IFREG) == 0))
+	{
+		return NULL;
+	}
+	return fopen(fullpath, mode);
+}
+#else
 FILE *Q_fopen(const char *file, const char *mode)
 {
 	// make sure it's a regular file and not a directory or sth, see #394
@@ -1197,6 +1243,7 @@ FILE *Q_fopen(const char *file, const char *mode)
 	}
 	return fopen(file, mode);
 }
+#endif
 #endif
 
 int

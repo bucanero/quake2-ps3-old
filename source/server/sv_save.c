@@ -322,19 +322,7 @@ SV_WriteServerFile(qboolean autosave)
 		return;
 	}
 
-	char fullpath[MAX_OSPATH];
-	Sys_GetWorkDir(fullpath, MAX_OSPATH);
-	char* ptr = fullpath;
-	size_t counter = 0;
-	while (*ptr != '\0')
-	{
-		++counter;
-		++ptr;
-	}
-	Q_strlcpy(ptr, "/game.ssv", MAX_OSPATH - counter);
-	
-	ge->WriteGame(fullpath, autosave);
-	// ge->WriteGame("game.ssv", autosave);
+	ge->WriteGame("game.ssv", autosave);
 
 	Sys_SetWorkDir(workdir);
 }
