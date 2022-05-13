@@ -22,9 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stdint.h>
 #include <limits.h>
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_video.h>
 #include "header/ps3_fixes.h"
+
+static sw_context_t* context;
 
 #include "header/local.h"
 
@@ -35,7 +35,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 viddef_t	vid;
 pixel_t		*vid_buffer = NULL;
-static pixel_t	*swap_buffers = NULL;
 static pixel_t	*swap_frames[2] = {NULL, NULL};
 static int	swap_current = 0;
 espan_t		*vid_polygon_spans = NULL;
@@ -162,7 +161,7 @@ cvar_t	*r_fullbright;
 cvar_t  *r_lerpmodels;
 static cvar_t  *r_novis;
 cvar_t  *r_modulate;
-static cvar_t  *r_vsync;
+cvar_t  *r_vsync;
 static cvar_t  *r_customwidth;
 static cvar_t  *r_customheight;
 
@@ -212,11 +211,9 @@ pixel_t		*d_viewbuffer;
 zvalue_t	*d_pzbuffer;
 
 static void Draw_GetPalette (void);
-static void RE_BeginFrame( float camera_separation );
+void RE_BeginFrame( float camera_separation );
 static void Draw_BuildGammaTable(void);
-static void RE_FlushFrame(int vmin, int vmax);
-static void RE_CleanFrame(void);
-static void RE_EndFrame(void);
+void RE_EndFrame(void);
 static void R_DrawBeam(const entity_t *e);
 
 /*
@@ -436,9 +433,8 @@ R_UnRegister (void)
 	ri.Cmd_RemoveCommand( "imagelist" );
 }
 
-static void RE_ShutdownContext(void);
-static void SWimp_CreateRender(int width, int height);
-static int RE_InitContext(void *win);
+extern void RE_ShutdownContext(void);
+sw_rend_t SWimp_CreateRender(sw_context_t* n_context);
 static qboolean RE_SetMode(void);
 
 /*
@@ -446,7 +442,7 @@ static qboolean RE_SetMode(void);
 R_Init
 ===============
 */
-static qboolean
+qboolean
 RE_Init(void)
 {
 	R_RegisterVariables ();
@@ -491,7 +487,7 @@ RE_Init(void)
 RE_Shutdown
 ===============
 */
-static void
+void
 RE_Shutdown (void)
 {
 	// free z buffer
@@ -1303,7 +1299,7 @@ RE_RenderFrame
 
 ================
 */
-static void
+void
 RE_RenderFrame (refdef_t *fd)
 {
 	r_newrefdef = *fd;
@@ -1422,7 +1418,7 @@ RE_RenderFrame (refdef_t *fd)
 /*
 ** R_InitGraphics
 */
-static void
+void
 R_InitGraphics( int width, int height )
 {
 	// free z buffer
@@ -1452,7 +1448,7 @@ static rserr_t	SWimp_SetMode(int *pwidth, int *pheight, int mode, int fullscreen
 /*
 ** RE_BeginFrame
 */
-static void
+void
 RE_BeginFrame( float camera_separation )
 {
 	// pallete without changes
@@ -1591,11 +1587,11 @@ R_GammaCorrectAndSetPalette( const unsigned char *palette )
 /*
 ** RE_SetPalette
 */
-static void
+void
 RE_SetPalette(const unsigned char *palette)
 {
 	// clear screen to black to avoid any palette flash
-	RE_CleanFrame();
+	context->CleanFrame();
 
 	if (palette)
 	{
@@ -1733,7 +1729,7 @@ static const char	*suf[6] = {"rt", "bk", "lf", "ft", "up", "dn"};
 static const int	r_skysideimage[6] = {5, 2, 4, 1, 0, 3};
 extern	mtexinfo_t		r_skytexinfo[6];
 
-static void
+void
 RE_SetSky (char *name, float rotate, vec3_t axis)
 {
 	int		i;
@@ -1793,7 +1789,7 @@ Draw_GetPalette (void)
 RE_RegisterSkin
 ===============
 */
-static struct image_s *
+struct image_s *
 RE_RegisterSkin (char *name)
 {
 	return R_FindImage (name, it_skin);
@@ -1807,7 +1803,7 @@ void R_Printf(int level, const char* msg, ...)
 	va_end(argptr);
 }
 
-static qboolean
+qboolean
 RE_IsVsyncActive(void)
 {
 	if (r_vsync->value)
@@ -1820,169 +1816,22 @@ RE_IsVsyncActive(void)
 	}
 }
 
-static int RE_PrepareForWindow(void)
-{
-	int flags = SDL_SWSURFACE;
-	return flags;
-}
-
 /*
 =====================
 RE_EndWorldRenderpass
 =====================
 */
-static qboolean
+qboolean
 RE_EndWorldRenderpass( void )
 {
 	return true;
 }
 
-/*
-===============
-GetRefAPI
-===============
-*/
-#ifndef UNICORE
-Q2_DLL_EXPORTED refexport_t
-#else
-refexport_t
-#endif
-GetRefAPI(refimport_t imp)
-{
-	// struct for save refexport callbacks, copy of re struct from main file
-	// used different variable name for prevent confusion and cppcheck warnings
-	refexport_t	refexport;
-
-	memset(&refexport, 0, sizeof(refexport_t));
-	ri = imp;
-
-	refexport.api_version = API_VERSION;
-
-	refexport.BeginRegistration = RE_BeginRegistration;
-	refexport.RegisterModel = RE_RegisterModel;
-	refexport.RegisterSkin = RE_RegisterSkin;
-	refexport.DrawFindPic = RE_Draw_FindPic;
-	refexport.SetSky = RE_SetSky;
-	refexport.EndRegistration = RE_EndRegistration;
-
-	refexport.RenderFrame = RE_RenderFrame;
-
-	refexport.DrawGetPicSize = RE_Draw_GetPicSize;
-
-	refexport.DrawPicScaled = RE_Draw_PicScaled;
-	refexport.DrawStretchPic = RE_Draw_StretchPic;
-	refexport.DrawCharScaled = RE_Draw_CharScaled;
-	refexport.DrawTileClear = RE_Draw_TileClear;
-	refexport.DrawFill = RE_Draw_Fill;
-	refexport.DrawFadeScreen = RE_Draw_FadeScreen;
-
-	refexport.DrawStretchRaw = RE_Draw_StretchRaw;
-
-	refexport.Init = RE_Init;
-	refexport.IsVSyncActive = RE_IsVsyncActive;
-	refexport.Shutdown = RE_Shutdown;
-	refexport.InitContext = RE_InitContext;
-	refexport.ShutdownContext = RE_ShutdownContext;
-	refexport.PrepareForWindow = RE_PrepareForWindow;
-
-	refexport.SetPalette = RE_SetPalette;
-	refexport.BeginFrame = RE_BeginFrame;
-	refexport.EndWorldRenderpass = RE_EndWorldRenderpass;
-	refexport.EndFrame = RE_EndFrame;
-
-    // Tell the client that we're unsing the
-	// new renderer restart API.
-    ri.Vid_RequestRestart(RESTART_NO);
-
-	Swap_Init ();
-
-	return refexport;
-}
-
-/*
- * FIXME: The following functions implement the render backend
- * through SDL renderer. Only small parts belong here, refresh.c
- * (at client side) needs to grow support funtions for software
- * renderers and the renderer must use them. What's left here
- * should be moved to a new file sw_sdl.c.
- *
- * Very, very problematic is at least the SDL initalization and
- * window creation in this code. That is guaranteed to clash with
- * the GL renderers (when switching GL -> Soft or the other way
- * round) and works only by pure luck. And only as long as there
- * is only one software renderer.
- */
-
-static SDL_Window	*window = NULL;
-static SDL_Texture	*texture = NULL;
-static SDL_Renderer	*renderer = NULL;
-
-int vid_buffer_height = 0;
-int vid_buffer_width = 0;
-
-static int
-RE_InitContext(void *win)
-{
-	char title[40] = {0};
-
-	if(win == NULL)
-	{
-		ri.Sys_Error(ERR_FATAL, "%s() must not be called with NULL argument!", __func__);
-		return false;
-	}
-
-	window = (SDL_Window *)win;
-
-	/* Window title - set here so we can display renderer name in it */
-	snprintf(title, sizeof(title), "Yamagi Quake II %s - Soft Render", YQ2VERSION);
-	SDL_SetWindowTitle(window, title);
-
-	if (r_vsync->value)
-	{
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	}
-	else
-	{
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	}
-
-	/* Select the color for drawing. It is set to black here. */
-	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-
-	/* Clear the entire screen to our selected color. */
-	SDL_RenderClear(renderer);
-
-	/* Up until now everything was drawn behind the scenes.
-	   This will show the new, black contents of the window. */
-	SDL_RenderPresent(renderer);
-
-	vid_buffer_height = vid.height;
-	vid_buffer_width = vid.width;
-
-	texture = SDL_CreateTexture(renderer,
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-				    SDL_PIXELFORMAT_BGRA8888,
-#else
-				    SDL_PIXELFORMAT_ARGB8888,
-#endif
-				    SDL_TEXTUREACCESS_STREAMING,
-				    vid_buffer_width, vid_buffer_height);
-
-	R_InitGraphics(vid_buffer_width, vid_buffer_height);
-	SWimp_CreateRender(vid_buffer_width, vid_buffer_height);
-
-	return true;
-}
-
+// free's memory allocated by renderer
+// on it's creation
 static void
-RE_ShutdownContext(void)
+RE_FreeRenderer(void)
 {
-	if (swap_buffers)
-	{
-		free(swap_buffers);
-	}
-	swap_buffers = NULL;
-	vid_buffer = NULL;
 	swap_frames[0] = NULL;
 	swap_frames[1] = NULL;
 
@@ -2075,18 +1924,6 @@ RE_ShutdownContext(void)
 		free(r_warpbuffer);
 	}
 	r_warpbuffer = NULL;
-
-	if (texture)
-	{
-		SDL_DestroyTexture(texture);
-	}
-	texture = NULL;
-
-	if (renderer)
-	{
-		SDL_DestroyRenderer(renderer);
-	}
-	renderer = NULL;
 }
 
 /*
@@ -2096,15 +1933,15 @@ point math used in R_ScanEdges() overflows at width 2048 !!
 char shift_size;
 
 static void
-RE_CopyFrame (Uint32 * pixels, int pitch, int vmin, int vmax)
+RE_CopyFrame (uint32_t * pixels, int pitch, int vmin, int vmax)
 {
-	Uint32 *sdl_palette = (Uint32 *)sw_state.currentpalette;
+	uint32_t *sdl_palette = (uint32_t *)sw_state.currentpalette;
 
 	// no gaps between images rows
 	if (pitch == vid_buffer_width)
 	{
-		const Uint32	*max_pixels;
-		Uint32	*pixels_pos;
+		const uint32_t	*max_pixels;
+		uint32_t	*pixels_pos;
 		pixel_t	*buffer_pos;
 
 		max_pixels = pixels + vmax;
@@ -2173,81 +2010,13 @@ RE_BufferDifferenceEnd(int vmin, int vmax)
 	return (pixel_t*)back_buffer - swap_frames[0] + sizeof(int);
 }
 
-static void
-RE_CleanFrame(void)
-{
-	int pitch;
-	Uint32 *pixels;
-
-	// memset(swap_buffers, 0,
-	// 	vid_buffer_height * vid_buffer_width * sizeof(pixel_t) * 2);
-
-	memset(swap_frames[0], 0,
-		vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
-	memset(swap_frames[1], 0,
-		vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
-
-	if (SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch))
-	{
-		Com_Printf("Can't lock texture: %s\n", SDL_GetError());
-		return;
-	}
-
-	// only cleanup texture without flush texture to screen
-	memset(pixels, 0, pitch * vid_buffer_height);
-	SDL_UnlockTexture(texture);
-
-	// All changes flushed
-	VID_NoDamageBuffer();
-}
-
-static void
-RE_FlushFrame(int vmin, int vmax)
-{
-	int pitch;
-	Uint32 *pixels;
-
-	if (SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch))
-	{
-		Com_Printf("Can't lock texture: %s\n", SDL_GetError());
-		return;
-	}
-	if (sw_partialrefresh->value)
-	{
-		RE_CopyFrame (pixels, pitch / sizeof(Uint32), vmin, vmax);
-	}
-	else
-	{
-		// On MacOS texture is cleaned up after render,
-		// code have to copy a whole screen to the texture
-		RE_CopyFrame (pixels, pitch / sizeof(Uint32), 0, vid_buffer_height * vid_buffer_width);
-	}
-
-	if ((sw_anisotropic->value > 0) && !fastmoving)
-	{
-		SmoothColorImage(pixels + vmin, vmax - vmin, sw_anisotropic->value);
-	}
-
-	SDL_UnlockTexture(texture);
-
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
-	SDL_RenderPresent(renderer);
-
-	// replace use next buffer
-	swap_current ++;
-	vid_buffer = swap_frames[swap_current&1];
-
-	// All changes flushed
-	VID_NoDamageBuffer();
-}
-
 /*
 ** RE_EndFrame
 **
 ** This does an implementation specific copy from the backbuffer to the
 ** front buffer.
 */
-static void
+void
 RE_EndFrame (void)
 {
 	int vmin, vmax;
@@ -2299,7 +2068,7 @@ RE_EndFrame (void)
 		}
 	}
 
-	RE_FlushFrame(vmin, vmax);
+	context->FlushFrame(vmin, vmax);
 }
 
 /*
@@ -2361,19 +2130,17 @@ SWimp_SetMode(int *pwidth, int *pheight, int mode, int fullscreen )
 	return retval;
 }
 
-static void
-SWimp_CreateRender(int width, int height)
+sw_rend_t
+SWimp_CreateRender(sw_context_t* n_context)
 {
+	sw_rend_t rend;
+	context = n_context;
+	int width = context->resolution.width;
+	int height = context->resolution.height;
+
 	swap_current = 0;
-	swap_buffers = malloc(height * width * sizeof(pixel_t) * 2);
-	if (!swap_buffers)
-	{
-		ri.Sys_Error(ERR_FATAL, "%s: Can't allocate swapbuffer.", __func__);
-		// code never returns after ERR_FATAL
-		return;
-	}
-	swap_frames[0] = swap_buffers;
-	swap_frames[1] = swap_buffers + height * width * sizeof(pixel_t);
+	swap_frames[0] = context->swap_frames[0];
+	swap_frames[1] = context->swap_frames[1];
 	vid_buffer = swap_frames[swap_current&1];
 	// Need to rewrite whole frame
 	VID_WholeDamageBuffer();
@@ -2431,6 +2198,21 @@ SWimp_CreateRender(int width, int height)
 	memset(sw_state.currentpalette, 0, sizeof(sw_state.currentpalette));
 
 	R_GammaCorrectAndSetPalette( d_8to24table );
+
+
+	// Functions
+	rend.CopyFrame = RE_CopyFrame;
+	rend.NoDamageBuffer = VID_NoDamageBuffer;
+	rend.Free = RE_FreeRenderer;
+
+	// Vars
+	rend.swap_current = &swap_current;
+
+	// Cvars
+	rend.sw_partialrefresh = sw_partialrefresh;
+	rend.sw_anisotropic = sw_anisotropic;
+
+	return rend;
 }
 
 #ifndef UNICORE
