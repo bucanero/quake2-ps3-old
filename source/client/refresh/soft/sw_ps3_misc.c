@@ -17,7 +17,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
-#include <SDL2/SDL.h>
+
+// Replaces GetTicks from S.D.L.
+#include "header/ps3_fixes.h"
 
 #include "header/local.h"
 
@@ -84,7 +86,7 @@ R_PrintTimes (void)
 	int		r_time2;
 	int		ms;
 
-	r_time2 = SDL_GetTicks();
+	r_time2 = getTicks();
 
 	ms = r_time2 - r_time1;
 
@@ -104,7 +106,7 @@ R_PrintDSpeeds (void)
 {
 	int	ms, dp_time, r_time2, rw_time, db_time, se_time, de_time, da_time;
 
-	r_time2 = SDL_GetTicks();
+	r_time2 = getTicks();
 
 	da_time = (da_time2 - da_time1);
 	dp_time = (dp_time2 - dp_time1);

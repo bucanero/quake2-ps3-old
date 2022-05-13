@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_video.h>
+#include "header/ps3_fixes.h"
 
 #include "header/local.h"
 
@@ -1182,7 +1183,7 @@ R_EdgeDrawing (entity_t *currententity)
 
 	if (r_dspeeds->value)
 	{
-		rw_time1 = SDL_GetTicks();
+		rw_time1 = getTicks();
 	}
 
 	// Build the Global Edget Table
@@ -1191,7 +1192,7 @@ R_EdgeDrawing (entity_t *currententity)
 
 	if (r_dspeeds->value)
 	{
-		rw_time2 = SDL_GetTicks();
+		rw_time2 = getTicks();
 		db_time1 = rw_time2;
 	}
 
@@ -1199,7 +1200,7 @@ R_EdgeDrawing (entity_t *currententity)
 
 	if (r_dspeeds->value)
 	{
-		db_time2 = SDL_GetTicks();
+		db_time2 = getTicks();
 		se_time1 = db_time2;
 	}
 
@@ -1336,7 +1337,7 @@ RE_RenderFrame (refdef_t *fd)
 	VectorCopy (fd->viewangles, lastviewangles);
 
 	if (r_speeds->value || r_dspeeds->value)
-		r_time1 = SDL_GetTicks();
+		r_time1 = getTicks();
 
 	R_SetupFrame ();
 
@@ -1358,7 +1359,7 @@ RE_RenderFrame (refdef_t *fd)
 
 	if (r_dspeeds->value)
 	{
-		se_time2 = SDL_GetTicks();
+		se_time2 = getTicks();
 		de_time1 = se_time2;
 	}
 
@@ -1378,15 +1379,15 @@ RE_RenderFrame (refdef_t *fd)
 
 	if (r_dspeeds->value)
 	{
-		de_time2 = SDL_GetTicks();
-		dp_time1 = SDL_GetTicks();
+		de_time2 = getTicks();
+		dp_time1 = getTicks();
 	}
 
 	// Duh !
 	R_DrawParticles ();
 
 	if (r_dspeeds->value)
-		dp_time2 = SDL_GetTicks();
+		dp_time2 = getTicks();
 
 	// Perform pixel palette blending ia the pics/colormap.pcx lower part lookup table.
 	R_DrawAlphaSurfaces(&ent);
@@ -1399,8 +1400,8 @@ RE_RenderFrame (refdef_t *fd)
 
 	if (r_dspeeds->value)
 	{
-		da_time1 = SDL_GetTicks();
-		da_time2 = SDL_GetTicks();
+		da_time1 = getTicks();
+		da_time2 = getTicks();
 	}
 
 	// Modify the palette (when taking hit or pickup item) so all colors are modified
@@ -1474,8 +1475,15 @@ RE_BeginFrame( float camera_separation )
 		// we need redraw everything
 		VID_WholeDamageBuffer();
 		// and backbuffer should be zeroed
-		memset(swap_buffers + ((swap_current + 1)&1), 0,
+
+		memset(swap_frames[(swap_current + 1)&1], 0,
 			vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
+
+		// not sure why is it was made like so, because swap_buffers
+		// is linear data [frame0, end_of_frame1) offseting it by 0 or 1
+		// just cleared frame0
+		// memset(swap_buffers + ((swap_current + 1)&1), 0,
+		// 	vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
 
 		vid_gamma->modified = false;
 		sw_overbrightbits->modified = false;
@@ -2171,8 +2179,13 @@ RE_CleanFrame(void)
 	int pitch;
 	Uint32 *pixels;
 
-	memset(swap_buffers, 0,
-		vid_buffer_height * vid_buffer_width * sizeof(pixel_t) * 2);
+	// memset(swap_buffers, 0,
+	// 	vid_buffer_height * vid_buffer_width * sizeof(pixel_t) * 2);
+
+	memset(swap_frames[0], 0,
+		vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
+	memset(swap_frames[1], 0,
+		vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
 
 	if (SDL_LockTexture(texture, NULL, (void**)&pixels, &pitch))
 	{
