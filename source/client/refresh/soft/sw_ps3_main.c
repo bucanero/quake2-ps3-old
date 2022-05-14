@@ -1422,14 +1422,14 @@ void
 R_InitGraphics( int width, int height )
 {
 	// free z buffer
-	if ( d_pzbuffer )
+	if (d_pzbuffer)
 	{
 		free(d_pzbuffer);
 		d_pzbuffer = NULL;
 	}
 
 	// free surface cache
-	if ( sc_base )
+	if (sc_base)
 	{
 		D_FlushCaches();
 		free(sc_base);

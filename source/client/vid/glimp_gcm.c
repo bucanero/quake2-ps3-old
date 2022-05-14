@@ -747,6 +747,32 @@ GLimp_InitGraphics(int fullscreen, int *pwidth, int *pheight)
 	int width = *pwidth;
 	int height = *pheight;
 
+	{
+		videoResolution res;
+		videoState state;
+		if (videoGetState (0, 0, &state) != 0)
+		{
+			// TODO
+		}
+
+		/* Make sure display is enabled */
+		if (state.state != 0)
+		{
+			// uncreachable?
+		}
+
+		/* Get the current resolution */
+		if (videoGetResolution (state.displayMode.resolution, &res) != 0)
+		{
+			// uncreachable?
+		}
+
+		if ((width > res.width) || (width > res.width))
+		{
+			return false;
+		}
+	}
+
 	#if 0
 	unsigned int fs_flag = 0;
 
