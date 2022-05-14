@@ -1,5 +1,6 @@
 #include "header/ps3_fixes.h"
 #include "header/rsxutil.h"
+#include <sysutil/video.h>
 
 // ---------------------------------------------------
 //            Internal refresher stuff
@@ -48,6 +49,10 @@ static sw_rend_t sw_renderer;
 // ---------------------------------------------------
 //   GCM frontend implementation variables
 // ---------------------------------------------------
+static int rend_buffer_width;
+static int rend_buffer_height;
+static int rend_buffer_pitch;
+
 static rsxBuffer render_buffer;
 
 static gcmContextData* gcmContext;
@@ -67,13 +72,13 @@ RE_FlushFrame(int vmin, int vmax)
 	{
 		// Copy previus buffer to current
 		// Update required part
-		sw_renderer.CopyFrame(pixels, vid_buffer_width, vmin, vmax);
+		sw_renderer.CopyFrame(pixels, rend_buffer_pitch / sizeof(uint32_t), vmin, vmax);
 	}
 	else
 	{
 		// On MacOS texture is cleaned up after render,
 		// code have to copy a whole screen to the texture
-		sw_renderer.CopyFrame(pixels, vid_buffer_width, 0, vid_buffer_height * vid_buffer_width);
+		sw_renderer.CopyFrame(pixels, rend_buffer_pitch / sizeof(uint32_t), 0, vid_buffer_height * vid_buffer_width);
 	}
 
 	if ((sw_renderer.sw_anisotropic->value > 0) && !fastmoving)
@@ -100,7 +105,7 @@ RE_CleanFrame(void)
 
 	// only cleanup texture without flush texture to screen
 	memset(render_buffer.ptr, 0,
-		vid_buffer_height * vid_buffer_width * sizeof(uint32_t));
+		rend_buffer_width * rend_buffer_height * sizeof(uint32_t));
 
 	// All changes flushed
 	sw_renderer.NoDamageBuffer();
@@ -138,13 +143,28 @@ RE_InitContext(void *gcmCon)
 		gcmSetFlipMode(GCM_FLIP_VSYNC);
 	}
 
+
+	videoConfiguration vConfig;
+	if (videoGetConfiguration(0, &vConfig, NULL) != 0)
+	{
+		Com_Printf("Can't get video configuration\n");
+	}
+	else
+	{
+		videoResolution res;
+		videoGetResolution(vConfig.resolution, &res);
+		rend_buffer_width  = res.width;
+	 	rend_buffer_height = res.height;
+		rend_buffer_pitch  = vConfig.pitch;
+	}
+
 	context.resolution.height = vid_buffer_height = vid.height;
 	context.resolution.width = vid_buffer_width = vid.width;
 
 	Com_Printf("vid_buffer_width : %d\n", vid_buffer_width);
 	Com_Printf("vid_buffer_height : %d\n", vid_buffer_height);
 
-	makeBuffer(&render_buffer, vid_buffer_width, vid_buffer_height, 0);
+	makeBuffer(&render_buffer, rend_buffer_width, rend_buffer_height, 0);
 	flip(gcmContext, render_buffer.id);
 
 	R_InitGraphics(vid_buffer_width, vid_buffer_height);
@@ -171,6 +191,11 @@ void
 RE_ShutdownContext(void)
 {
 	gcmSetWaitFlip(gcmContext);
+	memset(render_buffer.ptr, 0,
+		rend_buffer_width * rend_buffer_height * sizeof(uint32_t));
+	flip(gcmContext, render_buffer.id);
+	waitFlip();
+
 	rsxFree(render_buffer.ptr);
 
 	if (swap_buffers)
