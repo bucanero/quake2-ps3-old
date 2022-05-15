@@ -22,11 +22,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stdint.h>
 #include <limits.h>
 
-#include "header/ps3_fixes.h"
-
-static sw_context_t* context;
-
 #include "header/local.h"
+#include "header/ps3_fixes.h"
+#include "header/ps3_local.h"
 
 #define NUMSTACKEDGES		2048
 #define NUMSTACKSURFACES	1024
@@ -35,8 +33,9 @@ static sw_context_t* context;
 
 viddef_t	vid;
 pixel_t		*vid_buffer = NULL;
-static pixel_t	*swap_frames[2] = {NULL, NULL};
-static int	swap_current = 0;
+static pixel_t	*swap_buffers = NULL;
+pixel_t	*swap_frames[2] = {NULL, NULL};
+int	swap_current = 0;
 espan_t		*vid_polygon_spans = NULL;
 pixel_t		*vid_colormap = NULL;
 pixel_t		*vid_alphamap = NULL;
@@ -48,7 +47,7 @@ static int	vid_zminu, vid_zminv, vid_zmaxu, vid_zmaxv;
 static vec3_t	lastvieworg;
 static vec3_t	lastviewangles;
 qboolean	fastmoving;
-static qboolean	palette_changed;
+qboolean	palette_changed;
 
 refimport_t	ri;
 
@@ -63,16 +62,7 @@ model_t		*r_worldmodel;
 
 pixel_t		*r_warpbuffer;
 
-typedef struct swstate_s
-{
-	qboolean	fullscreen;
-	int		prev_mode; // last valid SW mode
-
-	unsigned char	gammatable[256];
-	unsigned char	currentpalette[1024];
-} swstate_t;
-
-static swstate_t sw_state;
+swstate_t sw_state;
 
 void	*colormap;
 float	r_time1;
@@ -147,12 +137,12 @@ cvar_t	*sw_surfcacheoverride;
 cvar_t	*sw_waterwarp;
 static cvar_t	*sw_overbrightbits;
 cvar_t	*sw_custom_particles;
-static cvar_t	*sw_anisotropic;
+cvar_t	*sw_anisotropic;
 cvar_t	*sw_texture_filtering;
 cvar_t	*r_retexturing;
 cvar_t	*r_scale8bittextures;
 cvar_t	*sw_gunzposition;
-static cvar_t	*sw_partialrefresh;
+cvar_t	*sw_partialrefresh;
 
 cvar_t	*r_drawworld;
 static cvar_t	*r_drawentities;
@@ -321,7 +311,7 @@ VID_DamageBuffer(int u, int v)
 }
 
 // clean damage state
-static void
+void
 VID_NoDamageBuffer(void)
 {
 	vid_minu = vid_buffer_width;
@@ -433,8 +423,6 @@ R_UnRegister (void)
 	ri.Cmd_RemoveCommand( "imagelist" );
 }
 
-extern void RE_ShutdownContext(void);
-sw_rend_t SWimp_CreateRender(sw_context_t* n_context);
 static qboolean RE_SetMode(void);
 
 /*
@@ -1207,8 +1195,6 @@ R_EdgeDrawing (entity_t *currententity)
 
 //=======================================================================
 
-static void	R_GammaCorrectAndSetPalette(const unsigned char *palette);
-
 /*
 =============
 R_CalcPalette
@@ -1560,46 +1546,13 @@ RE_SetMode(void)
 }
 
 /*
-** R_GammaCorrectAndSetPalette
-*/
-static void
-R_GammaCorrectAndSetPalette( const unsigned char *palette )
-{
-	int i;
-
-	// Replace palette
-	for ( i = 0; i < 256; i++ )
-	{
-		if (sw_state.currentpalette[i*4+0] != sw_state.gammatable[palette[i*4+2]] ||
-			sw_state.currentpalette[i*4+1] != sw_state.gammatable[palette[i*4+1]] ||
-			sw_state.currentpalette[i*4+2] != sw_state.gammatable[palette[i*4+0]])
-		{
-			// SDL BGRA
-			// sw_state.currentpalette[i*4+0] = sw_state.gammatable[palette[i*4+2]]; // blue
-			// sw_state.currentpalette[i*4+1] = sw_state.gammatable[palette[i*4+1]]; // green
-			// sw_state.currentpalette[i*4+2] = sw_state.gammatable[palette[i*4+0]]; // red
-
-			// sw_state.currentpalette[i*4+3] = 0xFF; // alpha
-
-			// GCM ARGB
-			sw_state.currentpalette[i*4+0] = 0xFF; // alpha
-			sw_state.currentpalette[i*4+1] = sw_state.gammatable[palette[i*4+0]]; // red
-			sw_state.currentpalette[i*4+2] = sw_state.gammatable[palette[i*4+1]]; // green
-			sw_state.currentpalette[i*4+3] = sw_state.gammatable[palette[i*4+2]]; // blue
-
-			palette_changed = true;
-		}
-	}
-}
-
-/*
 ** RE_SetPalette
 */
 void
 RE_SetPalette(const unsigned char *palette)
 {
 	// clear screen to black to avoid any palette flash
-	context->CleanFrame();
+	RE_CleanFrame();
 
 	if (palette)
 	{
@@ -1837,9 +1790,15 @@ RE_EndWorldRenderpass( void )
 
 // free's memory allocated by renderer
 // on it's creation
-static void
-RE_FreeRenderer(void)
+void
+RE_ShutdownRenderer(void)
 {
+	if (swap_buffers)
+	{
+		free(swap_buffers);
+	}
+	swap_buffers = NULL;
+	vid_buffer = NULL;
 	swap_frames[0] = NULL;
 	swap_frames[1] = NULL;
 
@@ -1940,7 +1899,7 @@ point math used in R_ScanEdges() overflows at width 2048 !!
 */
 char shift_size;
 
-static void
+void
 RE_CopyFrame (uint32_t * pixels, int pitch, int vmin, int vmax)
 {
 	uint32_t *sdl_palette = (uint32_t *)sw_state.currentpalette;
@@ -2076,7 +2035,7 @@ RE_EndFrame (void)
 		}
 	}
 
-	context->FlushFrame(vmin, vmax);
+	RE_FlushFrame(vmin, vmax);
 }
 
 /*
@@ -2138,17 +2097,19 @@ SWimp_SetMode(int *pwidth, int *pheight, int mode, int fullscreen )
 	return retval;
 }
 
-sw_rend_t
-SWimp_CreateRender(sw_context_t* n_context)
+void
+SWimp_CreateRender(int width, int height)
 {
-	sw_rend_t rend;
-	context = n_context;
-	int width = context->resolution.width;
-	int height = context->resolution.height;
-
 	swap_current = 0;
-	swap_frames[0] = context->swap_frames[0];
-	swap_frames[1] = context->swap_frames[1];
+	swap_buffers = malloc(height * width * sizeof(pixel_t) * 2);
+	if (!swap_buffers)
+	{
+		ri.Sys_Error(ERR_FATAL, "%s: Can't allocate swapbuffer.", __func__);
+		// code never returns after ERR_FATAL
+		return;
+	}
+	swap_frames[0] = swap_buffers;
+	swap_frames[1] = swap_buffers + height * width * sizeof(pixel_t);
 	vid_buffer = swap_frames[swap_current&1];
 	// Need to rewrite whole frame
 	VID_WholeDamageBuffer();
@@ -2209,18 +2170,16 @@ SWimp_CreateRender(sw_context_t* n_context)
 
 
 	// Functions
-	rend.CopyFrame = RE_CopyFrame;
-	rend.NoDamageBuffer = VID_NoDamageBuffer;
-	rend.Free = RE_FreeRenderer;
+	// rend.CopyFrame = RE_CopyFrame;
+	// rend.NoDamageBuffer = VID_NoDamageBuffer;
+	// rend.Free = RE_FreeRenderer;
 
 	// Vars
-	rend.swap_current = &swap_current;
+	// rend.swap_current = &swap_current;
 
 	// Cvars
-	rend.sw_partialrefresh = sw_partialrefresh;
-	rend.sw_anisotropic = sw_anisotropic;
-
-	return rend;
+	// rend.sw_partialrefresh = sw_partialrefresh;
+	// rend.sw_anisotropic = sw_anisotropic;
 }
 
 #ifndef UNICORE

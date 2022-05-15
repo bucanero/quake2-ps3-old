@@ -1,54 +1,10 @@
-#include "header/ps3_fixes.h"
+#include "header/ps3_local.h"
 #include "header/rsxutil.h"
 #include <sysutil/video.h>
 
-// ---------------------------------------------------
-//            Internal refresher stuff
-// ---------------------------------------------------
-static pixel_t	*swap_buffers = NULL;
-void R_InitGraphics(int width,int height);
-sw_rend_t SWimp_CreateRender(sw_context_t* n_context);
-
-/*\
- * Other main functions declarations.
- * Those are here just to export
- * them from sw_ps3_main.c
- * and not called frome here
- *
- * Maybe it's better to create separate
- * header for main and sdl functions
- * b/c they never would be used as
- * two separate shared libs.
- * Current state is confusing and
- * shitcode atually
-\*/
-struct image_s * RE_RegisterSkin (char *name);
-void RE_SetSky (char *name, float rotate, vec3_t axis);
-void RE_RenderFrame (refdef_t *fd);
-qboolean RE_Init (void);
-qboolean RE_IsVsyncActive (void);
-void RE_Shutdown (void);
-void RE_SetPalette(const unsigned char *palette);
-void RE_BeginFrame( float camera_separation );
-qboolean RE_EndWorldRenderpass (void);
-void RE_EndFrame(void);
-
-extern cvar_t* r_vsync;
-// ---------------------------------------------------
-
-
-// ---------------------------------------------------
-//   Structs used in communication between front-
-//       and back- ends of refresher
-// ---------------------------------------------------
-static sw_context_t context;
-static sw_rend_t sw_renderer;
-// ---------------------------------------------------
-
-
-// ---------------------------------------------------
+// -----------------------------------------------------------------------------
 //   GCM frontend implementation variables
-// ---------------------------------------------------
+// -----------------------------------------------------------------------------
 static int rend_buffer_width;
 static int rend_buffer_height;
 static int rend_buffer_pitch;
@@ -56,64 +12,100 @@ static int rend_buffer_pitch;
 static rsxBuffer render_buffer;
 
 static gcmContextData* gcmContext;
-// ---------------------------------------------------
+// -----------------------------------------------------------------------------
 
 
-// =========================================
+// =============================================================================
 //   Internal software refresher functions
-// =========================================
+// =============================================================================
 
-static void
+void
 RE_FlushFrame(int vmin, int vmax)
 {
 	uint32_t *pixels = render_buffer.ptr;
 
-	if (sw_renderer.sw_partialrefresh->value)
+	if (sw_partialrefresh->value)
 	{
-		// Copy previus buffer to current
 		// Update required part
-		sw_renderer.CopyFrame(pixels, rend_buffer_pitch / sizeof(uint32_t), vmin, vmax);
+		RE_CopyFrame(pixels, rend_buffer_pitch / sizeof(uint32_t),
+			vmin, vmax);
 	}
 	else
 	{
-		// On MacOS texture is cleaned up after render,
-		// code have to copy a whole screen to the texture
-		sw_renderer.CopyFrame(pixels, rend_buffer_pitch / sizeof(uint32_t), 0, vid_buffer_height * vid_buffer_width);
+		RE_CopyFrame(pixels, rend_buffer_pitch / sizeof(uint32_t),
+			0, vid_buffer_height * vid_buffer_width);
 	}
 
-	if ((sw_renderer.sw_anisotropic->value > 0) && !fastmoving)
+	if ((sw_anisotropic->value > 0) && !fastmoving)
 	{
-		SmoothColorImage(pixels + vmin, vmax - vmin, sw_renderer.sw_anisotropic->value);
+		SmoothColorImage(pixels + vmin, vmax - vmin, sw_anisotropic->value);
 	}
 
 	waitFlip();
 	flip(gcmContext, render_buffer.id);
 
 	// replace use next buffer
-	*(sw_renderer.swap_current) = *(sw_renderer.swap_current) + 1;
-	vid_buffer = context.swap_frames[*(sw_renderer.swap_current)&1];
+	swap_current = swap_current + 1;
+	vid_buffer = swap_frames[swap_current & 1];
 
 	// All changes flushed
-	sw_renderer.NoDamageBuffer();
+	VID_NoDamageBuffer();
 }
 
 void
 RE_CleanFrame(void)
 {
-	memset(swap_buffers, 0,
-		vid_buffer_height * vid_buffer_width * sizeof(pixel_t) * 2);
+	memset(swap_frames[0], 0,
+		vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
+	memset(swap_frames[1], 0,
+		vid_buffer_height * vid_buffer_width * sizeof(pixel_t));
 
 	// only cleanup texture without flush texture to screen
 	memset(render_buffer.ptr, 0,
 		rend_buffer_width * rend_buffer_height * sizeof(uint32_t));
 
 	// All changes flushed
-	sw_renderer.NoDamageBuffer();
+	VID_NoDamageBuffer();
 }
 
-// =========================================
+/*
+** R_GammaCorrectAndSetPalette
+*/
+/* It is crucial to had it here - different frontends had
+   different palettes types */
+void
+R_GammaCorrectAndSetPalette(const unsigned char *palette)
+{
+	int i;
+
+	// Replace palette
+	for ( i = 0; i < 256; i++ )
+	{
+		if (sw_state.currentpalette[i*4+0] != sw_state.gammatable[palette[i*4+2]] ||
+			sw_state.currentpalette[i*4+1] != sw_state.gammatable[palette[i*4+1]] ||
+			sw_state.currentpalette[i*4+2] != sw_state.gammatable[palette[i*4+0]])
+		{
+			// SDL BGRA
+			// sw_state.currentpalette[i*4+0] = sw_state.gammatable[palette[i*4+2]]; // blue
+			// sw_state.currentpalette[i*4+1] = sw_state.gammatable[palette[i*4+1]]; // green
+			// sw_state.currentpalette[i*4+2] = sw_state.gammatable[palette[i*4+0]]; // red
+
+			// sw_state.currentpalette[i*4+3] = 0xFF; // alpha
+
+			// GCM ARGB
+			sw_state.currentpalette[i*4+0] = 0xFF; // alpha
+			sw_state.currentpalette[i*4+1] = sw_state.gammatable[palette[i*4+0]]; // red
+			sw_state.currentpalette[i*4+2] = sw_state.gammatable[palette[i*4+1]]; // green
+			sw_state.currentpalette[i*4+3] = sw_state.gammatable[palette[i*4+2]]; // blue
+
+			palette_changed = true;
+		}
+	}
+}
+
+// =============================================================================
 //   Externaly called functions
-// =========================================
+// =============================================================================
 
 // S.D.L. specifict function to get
 // flags for window creation
@@ -130,8 +122,10 @@ RE_InitContext(void *gcmCon)
 {
 	if (gcmCon == NULL)
 	{
-		Com_Printf("%s() must not be called with NULL argument!\n", __func__);
-		ri.Sys_Error(ERR_FATAL, "%s() must not be called with NULL argument!", __func__);
+		Com_Printf("%s() must not be called with NULL argument!\n",
+			__func__);
+		ri.Sys_Error(ERR_FATAL,
+			"%s() must not be called with NULL argument!", __func__);
 		// FIXME unmapped memory on that
 		return false;
 	}
@@ -158,8 +152,8 @@ RE_InitContext(void *gcmCon)
 		rend_buffer_pitch  = vConfig.pitch;
 	}
 
-	context.resolution.height = vid_buffer_height = vid.height;
-	context.resolution.width = vid_buffer_width = vid.width;
+	vid_buffer_height = vid.height;
+	vid_buffer_width = vid.width;
 
 	Com_Printf("vid_buffer_width : %d\n", vid_buffer_width);
 	Com_Printf("vid_buffer_height : %d\n", vid_buffer_height);
@@ -168,21 +162,7 @@ RE_InitContext(void *gcmCon)
 	flip(gcmContext, render_buffer.id);
 
 	R_InitGraphics(vid_buffer_width, vid_buffer_height);
-
-	swap_buffers = malloc(vid_buffer_height * vid_buffer_width * sizeof(pixel_t) * 2);
-	if (!swap_buffers)
-	{
-		ri.Sys_Error(ERR_FATAL, "%s: Can't allocate swapbuffer.", __func__);
-		// code never returns after ERR_FATAL
-		return false;
-	}
-	context.swap_frames[0] = swap_buffers;
-	context.swap_frames[1] = swap_buffers + vid_buffer_height * vid_buffer_width * sizeof(pixel_t);
-
-	context.FlushFrame = RE_FlushFrame;
-	context.CleanFrame = RE_CleanFrame;
-
-	sw_renderer = SWimp_CreateRender(&context);
+	SWimp_CreateRender(vid_buffer_width, vid_buffer_height);
 
 	return true;
 }
@@ -198,17 +178,7 @@ RE_ShutdownContext(void)
 
 	rsxFree(render_buffer.ptr);
 
-	if (swap_buffers)
-	{
-		free(swap_buffers);
-	}
-	swap_buffers = NULL;
-
-	vid_buffer = NULL;
-	context.swap_frames[0] = NULL;
-	context.swap_frames[1] = NULL;
-
-	sw_renderer.Free();
+	RE_ShutdownRenderer();
 
 	gcmContext = NULL;
 }
@@ -267,7 +237,7 @@ GetRefAPI(refimport_t imp)
 	// new renderer restart API.
 	ri.Vid_RequestRestart(RESTART_NO);
 
-	Swap_Init ();
+	Swap_Init();
 
 	return refexport;
 }
