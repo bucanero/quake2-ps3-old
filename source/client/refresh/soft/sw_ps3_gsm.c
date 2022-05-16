@@ -1,22 +1,94 @@
 #include "header/ps3_local.h"
-#include "header/rsxutil.h"
 #include <sysutil/video.h>
+#include <rsx/gcm_sys.h>
+#include <rsx/rsx.h>
+#include <sys/systime.h>
 
 // -----------------------------------------------------------------------------
-//   GCM frontend implementation variables
+//	 GCM frontend implementation variables
 // -----------------------------------------------------------------------------
 static int rend_buffer_width;
 static int rend_buffer_height;
 static int rend_buffer_pitch;
+
+typedef struct
+{
+	int height;
+	int width;
+	int id;
+	uint32_t *ptr;
+	// Internal stuff
+	uint32_t offset;
+} rsxBuffer;
 
 static rsxBuffer render_buffer;
 
 static gcmContextData* gcmContext;
 // -----------------------------------------------------------------------------
 
+// =============================================================================
+//	 rsxutil functions
+// =============================================================================
+
+void
+RE_waitFlip()
+{
+	while (gcmGetFlipStatus () != 0)
+	{
+		/* Sleep, to not stress the cpu. */
+		sysUsleep(200); 
+	}
+	gcmResetFlipStatus();
+}
+
+qboolean
+RE_flip(gcmContextData *context, s32 buffer)
+{
+	if (gcmSetFlip(context, buffer) == 0)
+	{
+		rsxFlushBuffer(context);
+		// Prevent the RSX from continuing until the flip has finished.
+		gcmSetWaitFlip(context);
+
+		return true;
+	}
+	return false;
+}
+
+qboolean
+RE_makeBuffer(rsxBuffer* buffer, u16 width, u16 height, int id)
+{
+	int depth = sizeof(u32);
+	int pitch = depth * width;
+	int size = depth * width * height;
+
+	buffer->ptr = (uint32_t*)(rsxMemalign(64, size));
+
+	if (buffer->ptr == NULL)
+		goto error;
+
+	if (rsxAddressToOffset (buffer->ptr, &buffer->offset) != 0)
+		goto error;
+
+	/* Register the display buffer with the RSX */
+	if (gcmSetDisplayBuffer(id, buffer->offset, pitch, width, height) != 0)
+		goto error;
+
+	buffer->width = width;
+	buffer->height = height;
+	buffer->id = id;
+
+	return true;
+
+ error:
+	if (buffer->ptr != NULL)
+		rsxFree(buffer->ptr);
+
+	return true;
+}
 
 // =============================================================================
-//   Internal software refresher functions
+//	 Internal software refresher functions
 // =============================================================================
 
 void
@@ -41,8 +113,8 @@ RE_FlushFrame(int vmin, int vmax)
 		SmoothColorImage(pixels + vmin, vmax - vmin, sw_anisotropic->value);
 	}
 
-	waitFlip();
-	flip(gcmContext, render_buffer.id);
+	RE_waitFlip();
+	RE_flip(gcmContext, render_buffer.id);
 
 	// replace use next buffer
 	swap_current = swap_current + 1;
@@ -72,7 +144,7 @@ RE_CleanFrame(void)
 ** R_GammaCorrectAndSetPalette
 */
 /* It is crucial to had it here - different frontends had
-   different palettes types */
+	 different palettes types */
 void
 R_GammaCorrectAndSetPalette(const unsigned char *palette)
 {
@@ -104,7 +176,7 @@ R_GammaCorrectAndSetPalette(const unsigned char *palette)
 }
 
 // =============================================================================
-//   Externaly called functions
+//	 Externaly called functions
 // =============================================================================
 
 // S.D.L. specifict function to get
@@ -147,9 +219,9 @@ RE_InitContext(void *gcmCon)
 	{
 		videoResolution res;
 		videoGetResolution(vConfig.resolution, &res);
-		rend_buffer_width  = res.width;
+		rend_buffer_width	= res.width;
 	 	rend_buffer_height = res.height;
-		rend_buffer_pitch  = vConfig.pitch;
+		rend_buffer_pitch	= vConfig.pitch;
 	}
 
 	vid_buffer_height = vid.height;
@@ -158,8 +230,8 @@ RE_InitContext(void *gcmCon)
 	Com_Printf("vid_buffer_width : %d\n", vid_buffer_width);
 	Com_Printf("vid_buffer_height : %d\n", vid_buffer_height);
 
-	makeBuffer(&render_buffer, rend_buffer_width, rend_buffer_height, 0);
-	flip(gcmContext, render_buffer.id);
+	RE_makeBuffer(&render_buffer, rend_buffer_width, rend_buffer_height, 0);
+	RE_flip(gcmContext, render_buffer.id);
 
 	R_InitGraphics(vid_buffer_width, vid_buffer_height);
 	SWimp_CreateRender(vid_buffer_width, vid_buffer_height);
@@ -173,8 +245,8 @@ RE_ShutdownContext(void)
 	gcmSetWaitFlip(gcmContext);
 	memset(render_buffer.ptr, 0,
 		rend_buffer_width * rend_buffer_height * sizeof(uint32_t));
-	flip(gcmContext, render_buffer.id);
-	waitFlip();
+	RE_flip(gcmContext, render_buffer.id);
+	RE_waitFlip();
 
 	rsxFree(render_buffer.ptr);
 

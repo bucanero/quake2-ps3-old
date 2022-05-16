@@ -20,8 +20,9 @@ static int num_displays = 0;
 // --- my vars
 #include <sysutil/video.h>
 #include <malloc.h>
+#include <rsx/rsx.h>
 #include <rsx/gcm_sys.h>
-#include "header/rsxutil.h"
+#include <sys/systime.h>
 
 static gcmContextData *context = NULL;;
 static void *host_addr = NULL;
@@ -29,7 +30,9 @@ static videoDeviceInfo vDeviceInfo;
 int n_num_displays;
 static char** n_displayindices;
 
-#define HOST_SIZE	(32*1024*1024)
+#define CB_SIZE 0x100000
+#define HOST_SIZE (32*1024*1024)
+#define GCM_LABEL_INDEX 255
 // ----
 
 
@@ -527,6 +530,82 @@ updateConfig()
 	return true;
 }
 
+gcmContextData *
+n_initScreen (void *host_addr, u32 size)
+{
+	gcmContextData *context = NULL; /* Context to keep track of the RSX buffer. */
+	videoState state;
+	videoConfiguration vconfig;
+	videoResolution res; /* Screen Resolution */
+
+	/* Initilise Reality, which sets up the command buffer and shared IO memory */
+	rsxInit(&context, CB_SIZE, size, host_addr);
+	if (context == NULL)
+		goto error;
+
+	/* Get the state of the display */
+	if (videoGetState (0, 0, &state) != 0)
+		goto error;
+
+	/* Make sure display is enabled */
+	if (state.state != 0)
+		goto error;
+
+	/* Get the current resolution */
+	if (videoGetResolution (state.displayMode.resolution, &res) != 0)
+		goto error;
+
+	/* Configure the buffer format to xRGB */
+	memset (&vconfig, 0, sizeof(videoConfiguration));
+	vconfig.resolution = state.displayMode.resolution;
+	vconfig.format = VIDEO_BUFFER_FORMAT_XRGB;
+	vconfig.pitch = res.width * sizeof(u32);
+	vconfig.aspect = state.displayMode.aspect;
+
+	// waitRSXIdle
+	{
+		u32 sLabelVal = 1;
+
+		rsxSetWriteBackendLabel(context, GCM_LABEL_INDEX, sLabelVal);
+		rsxSetWaitLabel(context, GCM_LABEL_INDEX, sLabelVal);
+
+		sLabelVal++;
+
+		// waitFinish
+		{
+			rsxSetWriteBackendLabel(context, GCM_LABEL_INDEX, sLabelVal);
+
+			rsxFlushBuffer(context);
+
+			while( *(vu32 *)gcmGetLabelAddress(GCM_LABEL_INDEX) != sLabelVal)
+			{
+				sysUsleep(30);
+			}
+		}
+	}
+
+	if (videoConfigure (0, &vconfig, NULL, 0) != 0)
+		goto error;
+
+	if (videoGetState (0, 0, &state) != 0)
+		goto error;
+
+	gcmSetFlipMode(GCM_FLIP_VSYNC); // Wait for VSYNC to flip
+
+	gcmResetFlipStatus();
+
+	return context;
+
+error:
+	if (context)
+		rsxFinish(context, 0);
+
+	if (host_addr)
+		free(host_addr);
+
+	return NULL;
+}
+
 void
 n_initDisplayIndices()
 {
@@ -565,7 +644,7 @@ GLimp_Init(void)
 		/* Allocate a 1Mb buffer, alligned to a 1Mb boundary
 		* to be our shared IO memory with the RSX. */
 		host_addr = memalign(1024*1024, HOST_SIZE);
-		context = initScreen (host_addr, HOST_SIZE);
+		context = n_initScreen(host_addr, HOST_SIZE);
 		if (context == NULL)
 		{
 			Com_Printf("%s initScreen returned NULL\n", __func__);
