@@ -9,5 +9,5 @@ Notable parts:
  - `client/sound/ps3_sound.c` - replacement for sound.c setted to use only ps3's sound backend
  - `client/vid/glimp_gcm.c` - replacement for glimp\_sdl.c for video output
  - `client/refresh/sw_ps3_fixes` - replacement for SDL\_GetTicks to sync frames
- - `client/refresh/sw_ps3_main.c` and `client/refresh/sw_ps3_gcm.c` - replaces fixed to SDL sw\_main.c to be front/backe -end realisation with sw\_ps3\_gcm.c as frontend
+ - `client/refresh/sw_ps3_main.c` and `client/refresh/sw_ps3_gcm.c` - replaces fixed to SDL sw\_main.c to be (front/back)end realisation with sw\_ps3\_gcm.c as frontend
  - `client/refresh/sw_ps3_misc.c` - replacement for sw\_misc.c just to use own getTicks
