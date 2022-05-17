@@ -2,6 +2,7 @@
  * Copyright (C) 1997-2001 Id Software, Inc.
  * Copyright (C) 2010, 2013 Yamagi Burmeister
  * Copyright (C) 2005 Ryan C. Gordon
+ * Copyright (C) 2022 Sugaridze
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +21,9 @@
  * USA.
  *
  * =======================================================================
- *
+ * 
+ * Original text:
+ * 
  * SDL sound backend. Since SDL is just an API for sound playback, we
  * must caculate everything in software: mixing, resampling, stereo
  * spartializations, etc. Therefor this file is rather complex. :)
@@ -29,27 +32,43 @@
  * passed to SDL (in fact requested by SDL via the callback) and played
  * with a platform dependend SDL driver. Parts of this file are based
  * on ioQuake3s snd_sdl.c.
- *
+ * 
+ * PS3 Porting notes:
+ * 
+ * This is based on original sdl.c sound bacend from yq2.
+ * Only 2 crucial functions implemented from 0:
+ * SB_PS3_BackendInit      - SDL_BackendInit
+ * SB_PS3_BackendShutdown  - SDL_Shutdown
+ * 
+ * Others just renamed to use SB (sound backend) naming
+ * convention.
+ * 
+ * Functions which starts from SB_PS3_ and small letter
+ * also implemented from 0 and used in this file only
+ * 
  * =======================================================================
  */
 
-/* SDL includes */
-#include <SDL2/SDL.h>
+/* PS3 includes */
+#include <audio/audio.h>
+#include <sys/thread.h>
+#include <sys/systime.h>
 
 /* Local includes */
 #include "../../client/header/client.h"
 #include "../../client/sound/header/local.h"
 
+#include "header/ps3_local.h"
+
 /* Defines */
-#define SDL_PAINTBUFFER_SIZE 2048
-#define SDL_FULLVOLUME 80
-#define SDL_LOOPATTENUATE 0.003
+#define SB_PAINTBUFFER_SIZE 2048
+#define SB_FULLVOLUME 80
+#define SB_LOOPATTENUATE 0.003
 
 /* Globals */
-static cvar_t *s_sdldriver;
 static int *snd_p;
 static sound_t *backend;
-static portable_samplepair_t paintbuffer[SDL_PAINTBUFFER_SIZE];
+static portable_samplepair_t paintbuffer[SB_PAINTBUFFER_SIZE];
 static int beginofs;
 static int playpos = 0;
 static int samplesize = 0;
@@ -57,6 +76,17 @@ static int snd_inited = 0;
 static int snd_scaletable[32][256];
 static int snd_vol;
 static int soundtime;
+
+/* PS3's globals */
+static audioPortConfig config;
+u32 portNum;
+
+static int bufferClearLock = 0;
+sys_ppu_thread_t audioThreadId;
+
+static int audioThreadRunning;
+static u64 snd_key;
+static sys_event_queue_t snd_queue;
 
 /* ------------------------------------------------------------------ */
 
@@ -170,11 +200,11 @@ lpf_update_samples(LpfContext* lpf_context,int sample_count, portable_samplepair
 
 /*
  * Transfers a mixed "paint buffer" to
- * the SDL output buffer and places it
+ * the audio output buffer and places it
  * at the appropriate position.
  */
 static void
-SDL_TransferPaintBuffer(int endtime)
+SB_TransferPaintBuffer(int endtime)
 {
 	int out_mask;
 	int val;
@@ -328,7 +358,7 @@ SDL_TransferPaintBuffer(int endtime)
  * Mixes an 8 bit sample into a channel.
  */
 static void
-SDL_PaintChannelFrom8(channel_t *ch, sfxcache_t *sc, int count, int offset)
+SB_PaintChannelFrom8(channel_t *ch, sfxcache_t *sc, int count, int offset)
 {
 	int *lscale, *rscale;
 	unsigned char *sfx;
@@ -367,7 +397,7 @@ SDL_PaintChannelFrom8(channel_t *ch, sfxcache_t *sc, int count, int offset)
  * Mixes an 16 bit sample into a channel
  */
 static void
-SDL_PaintChannelFrom16(channel_t *ch, sfxcache_t *sc, int count, int offset)
+SB_PaintChannelFrom16(channel_t *ch, sfxcache_t *sc, int count, int offset)
 {
 	int leftvol, rightvol;
 	signed short *sfx;
@@ -400,7 +430,7 @@ SDL_PaintChannelFrom16(channel_t *ch, sfxcache_t *sc, int count, int offset)
  * the available output channels.
  */
 static void
-SDL_PaintChannels(int endtime)
+SB_PaintChannels(int endtime)
 {
 	int i;
 	channel_t *ch;
@@ -414,12 +444,12 @@ SDL_PaintChannels(int endtime)
 	{
 		int end;
 
-		/* if paintbuffer is smaller than SDL buffer */
+		/* if paintbuffer is smaller than audio buffer */
 		end = endtime;
 
-		if (endtime - paintedtime > SDL_PAINTBUFFER_SIZE)
+		if (endtime - paintedtime > SB_PAINTBUFFER_SIZE)
 		{
-			end = paintedtime + SDL_PAINTBUFFER_SIZE;
+			end = paintedtime + SB_PAINTBUFFER_SIZE;
 		}
 
 		/* start any playsounds */
@@ -487,11 +517,11 @@ SDL_PaintChannels(int endtime)
 				{
 					if (sc->width == 1)
 					{
-						SDL_PaintChannelFrom8(ch, sc, count, ltime - paintedtime);
+						SB_PaintChannelFrom8(ch, sc, count, ltime - paintedtime);
 					}
 					else
 					{
-						SDL_PaintChannelFrom16(ch, sc, count, ltime - paintedtime);
+						SB_PaintChannelFrom16(ch, sc, count, ltime - paintedtime);
 					}
 
 					ltime += count;
@@ -546,8 +576,8 @@ SDL_PaintChannels(int endtime)
 			}
 		}
 
-		/* transfer out according to SDL format */
-		SDL_TransferPaintBuffer(end);
+		/* transfer out according to output format */
+		SB_TransferPaintBuffer(end);
 		paintedtime = end;
 	}
 }
@@ -559,7 +589,7 @@ SDL_PaintChannels(int endtime)
  * must be started.
  */
 int
-SDL_DriftBeginofs(float timeofs)
+SB_DriftBeginofs(float timeofs)
 {
 	int start = (int)(cl.frame.servertime * 0.001f * sound.speed + beginofs);
 
@@ -585,7 +615,7 @@ SDL_DriftBeginofs(float timeofs)
  * Spatialize a sound effect based on it's origin.
  */
 static void
-SDL_SpatializeOrigin(vec3_t origin, float master_vol, float dist_mult, int *left_vol, int *right_vol)
+SB_SpatializeOrigin(vec3_t origin, float master_vol, float dist_mult, int *left_vol, int *right_vol)
 {
 	vec_t dot;
 	vec_t dist;
@@ -602,7 +632,7 @@ SDL_SpatializeOrigin(vec3_t origin, float master_vol, float dist_mult, int *left
 	VectorSubtract(origin, listener_origin, source_vec);
 
 	dist = VectorNormalize(source_vec);
-	dist -= SDL_FULLVOLUME;
+	dist -= SB_FULLVOLUME;
 
 	if (dist < 0)
 	{
@@ -645,7 +675,7 @@ SDL_SpatializeOrigin(vec3_t origin, float master_vol, float dist_mult, int *left
  * Spatializes a channel.
  */
 void
-SDL_Spatialize(channel_t *ch)
+SB_Spatialize(channel_t *ch)
 {
 	vec3_t origin;
 
@@ -667,7 +697,7 @@ SDL_Spatialize(channel_t *ch)
 		CL_GetEntitySoundOrigin(ch->entnum, origin);
 	}
 
-	SDL_SpatializeOrigin(origin, (float)ch->master_vol, ch->dist_mult, &ch->leftvol, &ch->rightvol);
+	SB_SpatializeOrigin(origin, (float)ch->master_vol, ch->dist_mult, &ch->leftvol, &ch->rightvol);
 }
 
 /*
@@ -676,7 +706,7 @@ SDL_Spatialize(channel_t *ch)
  * as the entities are sent to the client
  */
 void
-SDL_AddLoopSounds(void)
+SB_AddLoopSounds(void)
 {
 	int i, j;
 	int sounds[MAX_EDICTS];
@@ -730,7 +760,7 @@ SDL_AddLoopSounds(void)
 		ent = &cl_parse_entities[num];
 
 		/* find the total contribution of all sounds of this type */
-		SDL_SpatializeOrigin(ent->origin, 255.0f, SDL_LOOPATTENUATE, &left_total, &right_total);
+		SB_SpatializeOrigin(ent->origin, 255.0f, SB_LOOPATTENUATE, &left_total, &right_total);
 
 		for (j = i + 1; j < cl.frame.num_entities; j++)
 		{
@@ -743,7 +773,7 @@ SDL_AddLoopSounds(void)
 			num = (cl.frame.parse_entities + j) & (MAX_PARSE_ENTITIES - 1);
 			ent = &cl_parse_entities[num];
 
-			SDL_SpatializeOrigin(ent->origin, 255.0f, SDL_LOOPATTENUATE, &left, &right);
+			SB_SpatializeOrigin(ent->origin, 255.0f, SB_LOOPATTENUATE, &left, &right);
 
 			left_total += left;
 			right_total += right;
@@ -795,20 +825,15 @@ SDL_AddLoopSounds(void)
 	}
 }
 
-/*
- * Clears the playback buffer so
- * that all playback stops.
- */
 void
-SDL_ClearBuffer(void)
+SB_ClearBuffer(void)
 {
-	int clear;
-
-	if (sound_started == SS_NOT)
+	if (sound_started != SS_NOT)
 	{
 		return;
 	}
 
+	int clear;
 	s_rawend = 0;
 
 	if (sound.samplebits == 8)
@@ -820,7 +845,8 @@ SDL_ClearBuffer(void)
 		clear = 0;
 	}
 
-	SDL_LockAudio();
+	// SDL_LockAudio();
+	bufferClearLock = 1;
 
 	if (sound.buffer)
 	{
@@ -836,15 +862,12 @@ SDL_ClearBuffer(void)
 		}
 	}
 
-	SDL_UnlockAudio();
+	// SDL_UnlockAudio();
+	bufferClearLock = 0;
 }
 
-/*
- * Calculates the absolute timecode
- * of current playback.
- */
 static void
-SDL_UpdateSoundtime(void)
+SB_UpdateSoundtime(void)
 {
 	static int buffers;
 	static int oldsamplepos;
@@ -853,7 +876,7 @@ SDL_UpdateSoundtime(void)
 	fullsamples = sound.samples / sound.channels;
 
 	/* it is possible to miscount buffers if it has wrapped twice between
-	   calls to S_Update. Oh well. This a hack around that. */
+	   calls to SB_Update. Oh well. This a hack around that. */
 	if (playpos < oldsamplepos)
 	{
 		buffers++; /* buffer wrapped */
@@ -876,7 +899,7 @@ SDL_UpdateSoundtime(void)
  * based on current volume setting.
  */
 static void
-SDL_UpdateScaletable(void)
+SB_UpdateScaletable(void)
 {
 	int i;
 
@@ -910,7 +933,7 @@ SDL_UpdateScaletable(void)
  * performed.
  */
 qboolean
-SDL_Cache(sfx_t *sfx, wavinfo_t *info, byte *data, short volume,
+SB_Cache(sfx_t *sfx, wavinfo_t *info, byte *data, short volume,
 		  int begin_length, int  end_length,
 		  int attack_length, int fade_length)
 {
@@ -1009,7 +1032,7 @@ SDL_Cache(sfx_t *sfx, wavinfo_t *info, byte *data, short volume,
  * and cinematic playback.
  */
 void
-SDL_RawSamples(int samples, int rate, int width, int channels, byte *data, float volume)
+SB_RawSamples(int samples, int rate, int width, int channels, byte *data, float volume)
 {
 	float scale;
 	int dst;
@@ -1102,7 +1125,7 @@ SDL_RawSamples(int samples, int rate, int width, int channels, byte *data, float
  * back buffer.
  */
 void
-SDL_Update(void)
+SB_Update(void)
 {
 	channel_t *ch;
 	int i;
@@ -1124,10 +1147,10 @@ SDL_Update(void)
 
 	/* if the loading plaque is up, clear everything
 	   out to make sure we aren't looping a dirty
-	   SDL buffer while loading */
+	   audio buffer while loading */
 	if (cls.disable_screen)
 	{
-		SDL_ClearBuffer();
+		SB_ClearBuffer();
 		return;
 	}
 
@@ -1135,7 +1158,7 @@ SDL_Update(void)
 	   volume is modified */
 	if (s_volume->modified)
 	{
-		SDL_UpdateScaletable();
+		SB_UpdateScaletable();
 	}
 
 	/* update spatialization
@@ -1158,7 +1181,7 @@ SDL_Update(void)
 		}
 
 		/* respatialize channel */
-		SDL_Spatialize(ch);
+		SB_Spatialize(ch);
 
 		if (!ch->leftvol && !ch->rightvol)
 		{
@@ -1168,7 +1191,7 @@ SDL_Update(void)
 	}
 
 	/* add loopsounds */
-	SDL_AddLoopSounds();
+	SB_AddLoopSounds();
 
 	/* debugging output */
 	if (s_show->value)
@@ -1200,10 +1223,15 @@ SDL_Update(void)
 	}
 
 	/* Mix the samples */
-	SDL_LockAudio();
+	// SDL_LockAudio();
+	// Can't hear difference with and without
+	// but because orginal code prevented
+	// writing from buffer while it's beening
+	// edited do things the way they were.
+	bufferClearLock = 1;
 
-	/* Updates SDL time */
-	SDL_UpdateSoundtime();
+	/* Updates playpos */
+	SB_UpdateSoundtime();
 
 	if (!soundtime)
 	{
@@ -1229,8 +1257,9 @@ SDL_Update(void)
 		endtime = soundtime + samps;
 	}
 
-	SDL_PaintChannels(endtime);
-	SDL_UnlockAudio();
+	SB_PaintChannels(endtime);
+	// SDL_UnlockAudio();
+	bufferClearLock = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1240,7 +1269,7 @@ SDL_Update(void)
  * defineable variables
  */
 void
-SDL_SoundInfo(void)
+SB_SoundInfo(void)
 {
 	Com_Printf("%5d stereo\n", sound.channels - 1);
 	Com_Printf("%5d samples\n", sound.samples);
@@ -1251,226 +1280,272 @@ SDL_SoundInfo(void)
 	Com_Printf("%p sound buffer\n", sound.buffer);
 }
 
-/*
- * Callback funktion for SDL. Writes
- * sound data to SDL when requested.
- */
-static void
-SDL_Callback(void *data, Uint8 *stream, int length)
+// This could be called from audio or main threads 
+void
+SB_PS3_shutdownAudioLib(void)
 {
-	int length1;
-	int length2;
-	int pos = (playpos * (backend->samplebits / 8));
-
-	if (pos >= samplesize)
+	if (backend->buffer != NULL)
 	{
-		playpos = pos = 0;
+		free(backend->buffer);
+		backend->buffer = NULL;
 	}
+	playpos = samplesize = 0;
 
-	/* This can't happen! */
-	if (!snd_inited)
-	{
-		memset(stream, '\0', length);
-		return;
-	}
+	s32 ret;
+	printf("Shutting down audio library...\n");
 
-	int tobufferend = samplesize - pos;
+	ret = audioPortStop(portNum);
+	printf("  audioPortStop: %X\n",ret);
 
-	if (length > tobufferend)
-	{
-		length1 = tobufferend;
-		length2 = length - length1;
-	}
-	else
-	{
-		length1= length;
-		length2 = 0;
-	}
+	ret = audioRemoveNotifyEventQueue(snd_key);
+	printf("  audioRemoveNotifyEventQueue: %X\n",ret);
 
-	memcpy(stream, backend->buffer + pos, length1);
+	ret = audioPortClose(portNum);
+	printf("  audioPortClose: %X\n",ret);
 
-	/* Set new position */
-	if (length2 <= 0)
-	{
-		playpos += (length1 / (backend->samplebits / 8));
-	}
-	else
-	{
-		memcpy(stream + length1, backend->buffer, length2);
-		playpos = (length2 / (backend->samplebits / 8));
-	}
+	ret = sysEventQueueDestroy(snd_queue,0);
+	printf("  sysEventQueueDestroy: %X\n",ret);
 
-	if (playpos >= samplesize)
-	{
-		playpos = 0;
-	}
+	ret = audioQuit();
+	printf("  audioQuit: %X\n\n",ret);
 }
 
-/*
- * Initializes the SDL sound
- * backend and sets up SDL.
+/**
+ * @brief Fills specified block with samples from backend->buffer
+ * loops around buffer 
+ * 
+ * @param block pointer to a block
  */
-qboolean
-SDL_BackendInit(void)
+void
+SB_PS3_fillBlock(f32* block)
 {
-	char reqdriver[128];
-	SDL_AudioSpec desired;
-	SDL_AudioSpec obtained;
-	int tmp, val;
+	// position in audio data buffer
+	size_t buf_pos = (playpos * (backend->samplebits / 8));
 
-	/* This should never happen,
-	   but this is Quake 2 ... */
-	if (snd_inited)
+	// flag to check if we had looped around audio data
+	// buffer in process
+	int isLooped = 0;
+	
+	// Getting back to data buffer start
+	// if buf_pos overflows
+	if (buf_pos >= samplesize)
 	{
-		return 1;
+		playpos = buf_pos = 0;
 	}
 
-	int sndbits = (Cvar_Get("sndbits", "16", CVAR_ARCHIVE))->value;
-	int sndfreq = (Cvar_Get("s_khz", "44", CVAR_ARCHIVE))->value;
-	int sndchans = (Cvar_Get("sndchannels", "2", CVAR_ARCHIVE))->value;
-
-#ifdef _WIN32
-	s_sdldriver = (Cvar_Get("s_sdldriver", "directsound", CVAR_ARCHIVE));
-#elif __linux__
-	s_sdldriver = (Cvar_Get("s_sdldriver", "alsa", CVAR_ARCHIVE));
-#elif __APPLE__
-	s_sdldriver = (Cvar_Get("s_sdldriver", "CoreAudio", CVAR_ARCHIVE));
-#else
-	s_sdldriver = (Cvar_Get("s_sdldriver", "dsp", CVAR_ARCHIVE));
-#endif
-
-	snprintf(reqdriver, sizeof(reqdriver), "%s=%s", "SDL_AUDIODRIVER", s_sdldriver->string);
-	putenv(reqdriver);
-
-	Com_Printf("Starting SDL audio callback.\n");
-
-	if (!SDL_WasInit(SDL_INIT_AUDIO))
+	// Number of block frames written
+	size_t block_frames = 0;
+	while (block_frames < AUDIO_BLOCK_SAMPLES)
 	{
-		if (SDL_Init(SDL_INIT_AUDIO) == -1)
+		// playing 2 samples L - R
+		if (backend->samplebits == 16) // 16
 		{
-			Com_Printf ("Couldn't init SDL audio: %s.\n", SDL_GetError ());
-			return 0;
+			// 32768 == 2 ^ (16 - 1) <- signed int16 max
+			block[block_frames * 2 + 0] = (f32)( *( (s16*)(&backend->buffer[buf_pos]    ) ) / 32768.0f ); 
+			block[block_frames * 2 + 1] = (f32)( *( (s16*)(&backend->buffer[buf_pos + 2]) ) / 32768.0f );
+	
+			// moving buf_pos by channels * toBytes(samplebits)
+			buf_pos += 4;
+		}
+		else // 8
+		{
+			// TODO
+		}
+		++block_frames;
+
+		if (buf_pos >= samplesize)
+		{
+			// starting new loop around audio data buffer
+			buf_pos = 0;
+
+			// We can already say playpos after block writing
+			// 2 - number of channels
+			playpos = (AUDIO_BLOCK_SAMPLES - block_frames) * 2;
+
+			isLooped = 1;
 		}
 	}
-	const char* drivername = SDL_GetCurrentAudioDriver();
-	if(drivername == NULL)
+
+	// Are we fill entire block without looping?
+	if (isLooped == 0)
 	{
-		drivername = "(UNKNOWN)";
+		// Yes - moving playpos by number of single
+		// channel samples written
+		playpos += block_frames * 2;
 	}
 
-	Com_Printf("SDL audio driver is \"%s\".\n", drivername);
+	return;
+}
 
-	memset(&desired, '\0', sizeof(desired));
-	memset(&obtained, '\0', sizeof(obtained));
+// Thread to fill system audio buffer just in time
+static void
+SB_PS3_audioThread(void * arg)
+{
+	printf("Audio Thread started\n");
+	audioThreadRunning = 1;
 
-	/* Users are stupid */
-	if ((sndbits != 16) && (sndbits != 8))
+	f32 *block;
+	sys_event_t event;
+	u64 current_block;
+	f32 *dataStart;
+	u32 audio_block_index;
+
+	while (snd_inited)
 	{
-		sndbits = 16;
+		current_block = *(u64*)((u64)config.readIndex);
+		dataStart = (f32*)((u64)config.audioDataStart);
+		
+		// index of next block
+		audio_block_index = (current_block + 1) % config.numBlocks;
+
+		// wait untill previous block played
+		// 20 sec should be more than enough for that
+		// Otherwise assume something is broke and close 
+		// audio for safety
+		if (sysEventQueueReceive(snd_queue, &event, 20*1000) != 0)
+		{
+			printf("sysEventQueueReceive reached timeout. Closing audio.\n");
+			snd_inited = 0;
+			continue;
+		}
+		block = dataStart + config.channelCount * AUDIO_BLOCK_SAMPLES * audio_block_index;
+
+		if (bufferClearLock == 0)
+		{
+			SB_PS3_fillBlock(block);
+		}
 	}
 
-	if (sndfreq == 48)
-	{
-		desired.freq = 48000;
-	}
-	else if (sndfreq == 44)
-	{
-		desired.freq = 44100;
-	}
-	else if (sndfreq == 22)
-	{
-		desired.freq = 22050;
-	}
-	else if (sndfreq == 11)
-	{
-		desired.freq = 11025;
-	}
+	// Make all audio closing stuff here to be sure 
+	// we won't close them in the middle of something
+	SB_PS3_shutdownAudioLib();
 
-	desired.format = ((sndbits == 16) ? AUDIO_S16SYS : AUDIO_U8);
+	audioThreadRunning = 0;
+	sysThreadExit(0);
+}
 
-	if (desired.freq <= 11025)
+void
+SB_PS3_BackendShutdown(void)
+{
+	Com_Printf("Closing homemade sound backend...\n");
+	
+	if (audioThreadRunning == 1)
 	{
-		desired.samples = 256;
-	}
-	else if (desired.freq <= 22050)
-	{
-		desired.samples = 512;
-	}
-	else if (desired.freq <= 44100)
-	{
-		desired.samples = 1024;
+		Com_Printf("Waiting Audio Thread to shutdown...\n");
+		snd_inited = 0;
+		u64 threadRetval;
+		s32 ret = sysThreadJoin(audioThreadId, &threadRetval);
+		Com_Printf("  sysThreadJoin: %d\n", ret);
+		Com_Printf("Audio Thread ended with code: %ld\n", threadRetval);
 	}
 	else
 	{
-		desired.samples = 2048;
+		SB_PS3_shutdownAudioLib();
 	}
+	
+	// Make sure snd_inited == 0 even if the 
+	// thread was never started
+	snd_inited = 0;	
+}
 
-	desired.channels = sndchans;
-	desired.callback = SDL_Callback;
+qboolean
+SB_PS3_BackendInit(void)
+{
+	audioPortParam params;
+	int sndbits  = (Cvar_Set("sndbits", "16"))->value;
+	int sndfreq  = (Cvar_Set("s_khz", "48"))->value;
+	// int sndchans = (Cvar_Set("sndchannels", "2"))->value;
+	Cvar_Set("sndchannels", "2");
 
-	/* Okay, let's try our luck */
-	if (SDL_OpenAudio(&desired, &obtained) == -1)
+	if (audioInit() != 0)
 	{
-		Com_Printf("SDL_OpenAudio() failed: %s\n", SDL_GetError());
-		SDL_QuitSubSystem(SDL_INIT_AUDIO);
-		return 0;
+		Com_Printf("audioInit() != 0\n");
+		return false;
 	}
 
-	/* This points to the frontend */
+	//set some parameters we want
+	//either 2 or 8 channel
+	params.numChannels = AUDIO_PORT_2CH;
+	//8 16 or 32 block buffer
+	params.numBlocks = AUDIO_BLOCK_8;
+	//extended attributes
+	params.attrib = AUDIO_PORT_INITLEVEL;
+	//sound level (1 is default)
+	params.level = 1;
+
+	// Opening audio port with specified params
+	if (audioPortOpen(&params, &portNum) != 0)
+	{
+		Com_Printf("audioPortOpen() != 0\n");
+		audioQuit();
+		return false;
+	}
+	printf("  portNum: %d\n", portNum);
+
+	// Geting info on opened port
+	if (audioGetPortConfig(portNum, &config) != 0)
+	{
+		Com_Printf("audioGetPortConfig() != 0\n");
+		audioQuit();
+		return false;
+	}
+
+	// This points to the frontend
 	backend = &sound;
+	Com_Printf("  readIndex: %ld\n", *(u64*)((u64)config.readIndex));
+	Com_Printf("  status: %d\n", config.status); // 1
+	Com_Printf("  channelCount: %ld\n", config.channelCount); // 2
+	Com_Printf("  numBlocks: %ld\n", config.numBlocks);
+	Com_Printf("  portSize: %d\n", config.portSize);
+	Com_Printf("  audioDataStart: 0x%08X\n", config.audioDataStart);
 
-	playpos = 0;
-	backend->samplebits = obtained.format & 0xFF;
-	backend->channels = obtained.channels;
+	s32 ret = audioCreateNotifyEventQueue(&snd_queue, &snd_key);
+	Com_Printf("  audioCreateNotifyEventQueue: %08x\n",ret);
+	Com_Printf("  snd_queue: %16lx\n", (long unsigned int)snd_queue);
+	Com_Printf("  snd_key: %16lx\n", snd_key);
 
-	tmp = (obtained.samples * obtained.channels) * 10;
+	ret = audioSetNotifyEventQueue(snd_key);
+	Com_Printf("  audioSetNotifyEventQueue: %08x\n", ret);
 
-	if (tmp & (tmp - 1))
-	{	/* make it a power of two */
-		val = 1;
-		while (val < tmp)
-			val <<= 1;
+	ret = sysEventQueueDrain(snd_queue);
+	Com_Printf("  sysEventQueueDrain: %08x\n", ret);
 
-		tmp = val;
+	if (audioPortStart(portNum) != 0)
+	{
+		Com_Printf("audioPortStart() != 0\n");
+		audioQuit();
+		return false;
 	}
-
-	backend->samples = tmp;
+	backend->samplebits = sndbits; // 16
+	backend->speed = sndfreq * 1000; // 48000 - constant
+	backend->channels = config.channelCount; // 2
+	// FFS will use a whole size of audio buffer
+	/// to backend's buffer ()
+	backend->samples = AUDIO_BLOCK_SAMPLES * config.numBlocks * config.channelCount  * 4; // 4096
+	Com_Printf("backend->samples : %d\n", backend->samples );
+	samplesize = (backend->samples * (backend->samplebits / 8)); // 8192
+	backend->buffer = calloc(1, samplesize);
 
 	backend->submission_chunk = 1;
-	backend->speed = obtained.freq;
-	samplesize = (backend->samples * (backend->samplebits / 8));
-	backend->buffer = calloc(1, samplesize);
+
+	u64 prio = 1500;
+	size_t stacksize = 0x1000;
+	static int data = 69; 
+	void *threadarg = (void*)&data;
+
+	snd_inited = 1;
+	ret = sysThreadCreate(&audioThreadId, SB_PS3_audioThread, threadarg, prio, stacksize, THREAD_JOINABLE, "Audio Thread");
+	Com_Printf("  sysThreadCreate: %d\n",ret);
+
+
 	s_numchannels = MAX_CHANNELS;
 
 	s_underwater->modified = true;
 	s_underwater_gain_hf->modified = true;
 	lpf_initialize(&lpf_context, lpf_default_gain_hf, backend->speed);
 
-	SDL_UpdateScaletable();
-	SDL_PauseAudio(0);
-
-	Com_Printf("SDL audio initialized.\n");
-
+	SB_UpdateScaletable();
 	soundtime = 0;
-	snd_inited = 1;
-
+	
 	return 1;
 }
-
-/*
- * Shuts the SDL backend down.
- */
-void
-SDL_BackendShutdown(void)
-{
-	Com_Printf("Closing SDL audio device...\n");
-	SDL_PauseAudio(1);
-	SDL_CloseAudio();
-	SDL_QuitSubSystem(SDL_INIT_AUDIO);
-	free(backend->buffer);
-	backend->buffer = NULL;
-	playpos = samplesize = 0;
-	snd_inited = 0;
-	Com_Printf("SDL audio device shut down.\n");
-}
-

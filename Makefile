@@ -67,7 +67,7 @@ CONTENTID	:=	UP0001-$(APPID)_00-0000000000000000
 #---------------------------------------------------------------------------------
 
 #CFLAGS		=	-O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEIGEN2_SUPPORT
-CFLAGS = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DEGLW_GLES2 -DIOAPI_NO_64 -DYQ2OSTYPE=\"GameOS\" -DYQ2ARCH=\"PS3\" -DUNICORE -I/opt/X11/include
+CFLAGS = -O2 -Wall -mcpu=cell $(MACHDEP) $(INCLUDE) -D__RSX__ -DIOAPI_NO_64 -DYQ2OSTYPE=\"GameOS\" -DYQ2ARCH=\"PS3\" -DUNICORE -I/opt/X11/include
 
 #CXXFLAGS	=	$(CFLAGS)
 CXXFLAGS = $(CFLAGS) -std=c++11 
@@ -77,7 +77,7 @@ LDFLAGS		=	$(MACHDEP) -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lSDL2 -lGL -lEGL -lrsx -lgcm_sys -lnet -lio -lsysutil -lsysmodule -lrt -llv2 -laudio
+LIBS	:=	-lrsx -lgcm_sys -lnet -lio -lsysutil -lsysmodule -lrt -llv2 -laudio
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
