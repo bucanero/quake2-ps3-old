@@ -387,7 +387,7 @@ R_RegisterVariables (void)
 	r_farsee = ri.Cvar_Get("r_farsee", "0", CVAR_LATCH | CVAR_ARCHIVE);
 	r_lightmap = ri.Cvar_Get("r_lightmap", "0", 0);
 	r_colorlight = ri.Cvar_Get("sw_colorlight", "0", CVAR_ARCHIVE);
-	r_speeds = ri.Cvar_Get ("r_speeds", "1", 0);
+	r_speeds = ri.Cvar_Get ("r_speeds", "0", 0);
 	r_fullbright = ri.Cvar_Get ("r_fullbright", "0", 0);
 	r_drawentities = ri.Cvar_Get ("r_drawentities", "1", 0);
 	r_drawworld = ri.Cvar_Get ("r_drawworld", "1", 0);
