@@ -17,44 +17,189 @@ include $(PSL1GHT)/ppu_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source \
-				source/backends/ps3/shared \
-				source/backends/ps3 \
-				source/common/shared \
-				source/common/unzip \
-				source/common \
-				source/game/monster/berserker \
-				source/game/monster/boss2 \
-				source/game/monster/boss3 \
-				source/game/monster/brain \
-				source/game/monster/chick \
-				source/game/monster/flipper \
-				source/game/monster/float \
-				source/game/monster/flyer \
-				source/game/monster/gladiator \
-				source/game/monster/gunner \
-				source/game/monster/hover \
-				source/game/monster/infantry \
-				source/game/monster/insane \
-				source/game/monster/medic \
-				source/game/monster/misc \
-				source/game/monster/mutant \
-				source/game/monster/parasite \
-				source/game/monster/soldier \
-				source/game/monster/supertank \
-				source/game/monster/tank \
-				source/game/player \
-				source/game/savegame \
-				source/game \
-				source/server \
-				source/client/curl \
-				source/client/input \
-				source/client/menu \
-				source/client/refresh/files \
-				source/client/refresh/soft \
-				source/client/sound \
-				source/client/vid \
-				source/client
+
+#---------------------------------------------------------------------------------
+# C source files
+#---------------------------------------------------------------------------------
+#				PS3 backend
+CSOURCES	:=	\
+				source/backends/ps3/shared/dummy_hunk.c \
+				source/backends/ps3/system.c \
+				source/backends/ps3/main.c \
+				source/backends/ps3/network_loopback.c
+
+#				Common
+CSOURCES	+=	\
+				source/common/shared/shared.c \
+				source/common/shared/flash.c \
+				source/common/shared/rand.c \
+				source/common/unzip/miniz.c \
+				source/common/unzip/unzip.c \
+				source/common/unzip/ioapi.c \
+				source/common/argproc.c \
+				source/common/filesystem.c \
+				source/common/frame.c \
+				source/common/md4.c \
+				source/common/movemsg.c \
+				source/common/pmove.c \
+				source/common/netchan.c \
+				source/common/cmdparser.c \
+				source/common/clientserver.c \
+				source/common/zone.c \
+				source/common/crc.c \
+				source/common/collision.c \
+				source/common/szone.c \
+				source/common/glob.c \
+				source/common/cvar.c
+
+#				Game
+CSOURCES	+=	\
+				source/game/monster/berserker/berserker.c \
+				source/game/monster/boss2/boss2.c \
+				source/game/monster/boss3/boss3.c \
+				source/game/monster/boss3/boss31.c \
+				source/game/monster/boss3/boss32.c \
+				source/game/monster/brain/brain.c \
+				source/game/monster/chick/chick.c \
+				source/game/monster/flipper/flipper.c \
+				source/game/monster/float/float.c \
+				source/game/monster/flyer/flyer.c \
+				source/game/monster/gladiator/gladiator.c \
+				source/game/monster/gunner/gunner.c \
+				source/game/monster/hover/hover.c \
+				source/game/monster/infantry/infantry.c \
+				source/game/monster/insane/insane.c \
+				source/game/monster/medic/medic.c \
+				source/game/monster/misc/move.c \
+				source/game/monster/mutant/mutant.c \
+				source/game/monster/parasite/parasite.c \
+				source/game/monster/soldier/soldier.c \
+				source/game/monster/supertank/supertank.c \
+				source/game/monster/tank/tank.c \
+				source/game/player/view.c \
+				source/game/player/weapon.c \
+				source/game/player/client.c \
+				source/game/player/hud.c \
+				source/game/player/trail.c \
+				source/game/savegame/savegame.c \
+				source/game/g_phys.c \
+				source/game/g_turret.c \
+				source/game/g_utils.c \
+				source/game/g_target.c \
+				source/game/g_weapon.c \
+				source/game/g_combat.c \
+				source/game/g_items.c \
+				source/game/g_func.c \
+				source/game/g_cmds.c \
+				source/game/g_misc.c \
+				source/game/g_monster.c \
+				source/game/g_main.c \
+				source/game/g_svcmds.c \
+				source/game/g_spawn.c \
+				source/game/g_ai.c \
+				source/game/g_trigger.c \
+				source/game/g_chase.c
+
+#				Server
+CSOURCES	+=	\
+				source/server/sv_save.c \
+				source/server/sv_main.c \
+				source/server/sv_cmd.c \
+				source/server/sv_send.c \
+				source/server/sv_conless.c \
+				source/server/sv_world.c \
+				source/server/sv_entities.c \
+				source/server/sv_init.c \
+				source/server/sv_user.c \
+				source/server/sv_game.c
+
+#				Client curl
+CSOURCES	+=	\
+				source/client/curl/download.c \
+				source/client/curl/qcurl.c
+
+#				Client input
+CSOURCES	+=	\
+				source/client/input/input.c
+
+#				Client menu
+CSOURCES	+=	\
+				source/client/menu/menu.c \
+				source/client/menu/videomenu.c \
+				source/client/menu/qmenu.c
+
+#				Client refresh
+CSOURCES	+=	\
+				source/client/refresh/files/pcx.c \
+				source/client/refresh/files/wal.c \
+				source/client/refresh/files/stb.c \
+				source/client/refresh/files/pvs.c \
+				source/client/refresh/soft/sw_surf.c \
+				source/client/refresh/soft/sw_alias.c \
+				source/client/refresh/soft/sw_poly.c \
+				source/client/refresh/soft/sw_rast.c \
+				source/client/refresh/soft/sw_edge.c \
+				source/client/refresh/soft/sw_light.c \
+				source/client/refresh/soft/sw_bsp.c \
+				source/client/refresh/soft/sw_model.c \
+				source/client/refresh/soft/sw_draw.c \
+				source/client/refresh/soft/sw_part.c \
+				source/client/refresh/soft/sw_polyset.c \
+				source/client/refresh/soft/sw_scan.c \
+				source/client/refresh/soft/sw_aclip.c \
+				source/client/refresh/soft/sw_sprite.c \
+				source/client/refresh/soft/sw_image.c
+
+#				Client refresh - ps3 specific
+CSOURCES	+=	\
+				source/client/refresh/soft/sw_ps3_misc.c \
+				source/client/refresh/soft/sw_ps3_fixes.c \
+				source/client/refresh/soft/sw_ps3_main.c \
+				source/client/refresh/soft/sw_ps3_gsm.c
+
+#				Client sound
+CSOURCES	+=	\
+				source/client/sound/ogg.c \
+				source/client/sound/wave.c \
+				source/client/sound/qal.c \
+				source/client/sound/openal.c \
+
+#				Client sound - ps3 specific
+CSOURCES	+=	\
+				source/client/sound/ps3_sound_backend.c \
+				source/client/sound/ps3_sound.c
+
+#				Client vid
+CSOURCES	+=	\
+				source/client/vid/vid.c
+
+#				Client vid - ps3 specific
+CSOURCES	+=	\
+				source/client/vid/glimp_gcm.c \
+
+#				Client base
+CSOURCES	+=	\
+				source/client/cl_prediction.c \
+				source/client/cl_lights.c \
+				source/client/cl_entities.c \
+				source/client/cl_tempentities.c \
+				source/client/cl_screen.c \
+				source/client/cl_cin.c \
+				source/client/cl_console.c \
+				source/client/cl_view.c \
+				source/client/cl_download.c \
+				source/client/cl_inventory.c \
+				source/client/cl_main.c \
+				source/client/cl_effects.c \
+				source/client/cl_particles.c \
+				source/client/cl_network.c \
+				source/client/cl_keyboard.c \
+				source/client/cl_input.c \
+				source/client/cl_parse.c
+
+#---------------------------------------------------------------------------------
+
+SOURCES		:=
 DATA		:=	data
 INCLUDES	:=	include $(PS3DEV)/portlibs/ppu/include
 
@@ -95,7 +240,8 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+					$(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
+					$(foreach cfile, $(CSOURCES), $(CURDIR)/$(dir $(cfile)))
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
@@ -104,7 +250,8 @@ export BUILDDIR	:=	$(CURDIR)/$(BUILD)
 #---------------------------------------------------------------------------------
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CFILES		:=	$(foreach cfile, $(CSOURCES), $(notdir $(cfile)))
+
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
@@ -129,8 +276,7 @@ export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 export INCLUDE := 	$(foreach dir,$(INCLUDES), -I$(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 					$(LIBPSL1GHT_INC) -I$(CURDIR)/$(BUILD) \
-					-I$(PORTLIBS)/include -I$(CURDIR)/../RSXGL/extsrc/eigen/Eigen \
-					-I$(CURDIR)/../RSXGL/extsrc/eigen
+					-I$(PORTLIBS)/include
 
 #---------------------------------------------------------------------------------
 # build a list of library paths
