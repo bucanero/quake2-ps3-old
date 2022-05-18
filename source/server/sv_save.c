@@ -165,10 +165,12 @@ SV_WriteLevelFile(void)
 	char workdir[MAX_OSPATH];
 	FILE *f;
 
-	Com_DPrintf("SV_WriteLevelFile()\n");
+	Com_DPrintf("SV_WriteLevelFile:\n");
 
 	Com_sprintf(name, sizeof(name), "%s/save/current/%s.sv2",
 				FS_Gamedir(), sv.name);
+	Com_DPrintf("Opening sv2 file:\n");
+	Com_DPrintf("%s\n", name);
 	f = Q_fopen(name, "wb");
 
 	if (!f)
@@ -193,6 +195,8 @@ SV_WriteLevelFile(void)
 	}
 
 	Com_sprintf(name, sizeof(name), "%s.sav", sv.name);
+	Com_DPrintf("Writing level to .sav file:\n");
+	Com_DPrintf("%s\n", name);
 	ge->WriteLevel(name);
 
 	Sys_SetWorkDir(workdir);

@@ -401,11 +401,13 @@ Sys_Realpath(const char *in, char *out, size_t size)
 void
 Sys_GetWorkDir(char *buffer, size_t len)
 {
+	Com_Printf("%s\n", __func__);
 	if (getcwd(buffer, len) != 0)
 	{
+		Com_Printf("%s\n", buffer);
 		return;
 	}
-
+	Com_Printf("\\0\n");
 	buffer[0] = '\0';
 }
 
@@ -415,11 +417,13 @@ Sys_GetWorkDir(char *buffer, size_t len)
 qboolean
 Sys_SetWorkDir(char *path)
 {
+	Com_Printf("%s(%s):\n", __func__, path);
 	if (chdir(path) == 0)
 	{
+		Com_Printf("true\n");
 		return true;
 	}
-
+	Com_Printf("false\n");
 	return false;
 }
 
